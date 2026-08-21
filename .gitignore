@@ -1,6 +1,7 @@
 node_modules/
 out/
 release/
+可直接打开-黑马记账-*/
 coverage/
 playwright-report/
 test-results/

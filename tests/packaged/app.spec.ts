@@ -9,8 +9,10 @@ test('Windows 解压版可以启动并打开本地账本', async () => {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([key, value]) => key !== 'ELECTRON_RUN_AS_NODE' && value !== undefined)
   ) as Record<string, string>
+  const executablePath = process.env.HEIMA_PACKAGED_EXE ?? join(root, 'release', 'win-unpacked', 'HeimaAccounting.exe')
   const app = await electron.launch({
-    executablePath: join(root, 'release', 'win-unpacked', 'HeimaAccounting.exe'),
+    executablePath,
+    args: ['--disable-gpu', '--no-sandbox'],
     env: { ...env, HEIMA_TEST_USER_DATA: userData, NODE_ENV: 'production' }
   })
   try {

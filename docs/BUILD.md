@@ -10,7 +10,9 @@
 
 项目路径可以包含中文和空格，当前项目已经在该路径完成类型检查、测试、Electron 启动和构建。
 
-当前源码版本为1.3.0预览版。用户决定先体验功能再制作安装包，因此本轮没有生成1.3.0 Windows安装版或便携版，`release` 中仍是已验证的1.1.0产物。
+当前源码版本为1.3.0预览版。用户决定先体验功能再制作安装包，因此没有生成1.3.0 Windows安装版或单文件便携版，`release` 中仍是旧1.0.0/1.1.0产物。
+
+已经生成可直接打开的1.3.0免安装目录：`可直接打开-黑马记账-1.3.0预览版/win-unpacked`，共约475.6MB。普通用户不应进入内部寻找EXE，直接双击根目录 `00-点我打开黑马记账-当前最新版.cmd`。
 
 ## 安装依赖
 
@@ -44,6 +46,27 @@ npm run test:packaged
 当前测试环境的Electron子进程需要在Playwright启动参数中关闭GPU和测试沙箱；这些参数只存在于测试文件，正式App仍保持渲染进程沙箱、上下文隔离和硬件加速。
 
 ## Windows 构建
+
+### 生成免安装预览目录
+
+这不是安装包，不会向Windows安装程序。先执行生产构建，再让electron-builder生成解压运行目录：
+
+```powershell
+$env:ELECTRON_BUILDER_CACHE = "$PWD\.cache\electron-builder"
+npm.cmd run build
+npm.cmd exec electron-builder -- --dir --win --x64 "--config.directories.output=可直接打开-黑马记账-1.3.0预览版"
+```
+
+测试当前免安装程序：
+
+```powershell
+$env:HEIMA_PACKAGED_EXE = "$PWD\可直接打开-黑马记账-1.3.0预览版\win-unpacked\HeimaAccounting.exe"
+npm.cmd run test:packaged
+```
+
+自动测试为了适应受控环境，会使用测试专用的关闭GPU和测试沙箱参数；普通用户启动文件不带这些参数，正式App仍保留原安全配置。
+
+### 生成安装版和单文件便携版
 
 ```powershell
 npm run dist:win
