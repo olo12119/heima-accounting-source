@@ -4,6 +4,7 @@ import { BarChart3, CalendarClock, Database, Home, Plus, ReceiptText, ShieldChec
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { Expense } from '../../../shared/types'
 import { ExpenseFormDialog } from './ExpenseFormDialog'
+import { MoodThemePicker } from './MoodThemePicker'
 
 type ShellContextValue = {
   openNewExpense: () => void
@@ -40,7 +41,7 @@ export function AppShell(): React.JSX.Element {
         <aside className="sidebar">
           <div className="brand">
             <motion.img
-              src="./logo-app-v2.png"
+              src="./logo-app-v3.png"
               alt=""
               initial={reduceMotion ? false : { opacity: 0, scale: 0.72, rotate: -8 }}
               animate={{ opacity: 1, scale: 1, rotate: 0 }}
@@ -66,7 +67,7 @@ export function AppShell(): React.JSX.Element {
             <motion.div key={location.pathname} initial={reduceMotion ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
               <h1>{page.title}</h1><p>{page.subtitle}</p>
             </motion.div>
-            <button className="button primary add-button" onClick={context.openNewExpense}><Plus size={18} />记一笔<span className="button-shine" /></button>
+            <div className="topbar-actions"><MoodThemePicker /><button className="button primary add-button" onClick={context.openNewExpense}><Plus size={18} />记一笔</button></div>
           </header>
           <div className="page-content">
             <motion.div

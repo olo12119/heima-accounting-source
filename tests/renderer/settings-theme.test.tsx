@@ -10,7 +10,7 @@ describe('多配色主题设置', () => {
   it('颜色主题和明暗方式分别保存', async () => {
     const api = {
       getSettings: vi.fn().mockResolvedValue({ theme: 'system', colorTheme: 'forest' }),
-      getStatus: vi.fn().mockResolvedValue({ ready: true, databasePath: 'test.sqlite3', version: '1.4.0' }),
+      getStatus: vi.fn().mockResolvedValue({ ready: true, databasePath: 'test.sqlite3', version: '1.5.0' }),
       getLockStatus: vi.fn().mockResolvedValue({ enabled: false, locked: false }),
       setColorTheme: vi.fn().mockResolvedValue({ theme: 'system', colorTheme: 'ocean' }),
       setTheme: vi.fn().mockResolvedValue({ theme: 'dark', colorTheme: 'ocean' })
@@ -22,7 +22,7 @@ describe('多配色主题设置', () => {
 
     expect(await screen.findByText('外观与数据，由你自己掌控')).toBeInTheDocument()
     expect(screen.queryByText('简单、清楚地知道自己的钱花到哪里去了。')).not.toBeInTheDocument()
-    await user.click(await screen.findByRole('button', { name: /极光深海/ }))
+    await user.click(await screen.findByRole('button', { name: /深海专注/ }))
     await waitFor(() => expect(api.setColorTheme).toHaveBeenCalledWith('ocean'))
     await user.click(screen.getByRole('button', { name: /深色/ }))
     await waitFor(() => expect(api.setTheme).toHaveBeenCalledWith('dark'))

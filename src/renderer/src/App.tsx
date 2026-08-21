@@ -40,7 +40,7 @@ export default function App(): React.JSX.Element {
   ), [settingsQuery.data?.theme, settingsQuery.data?.colorTheme])
 
   if (statusQuery.isLoading) {
-    return <div className="splash"><img src="./logo-app-v2.png" alt="" /><strong>黑马记账</strong><span>正在准备你的账本…</span></div>
+    return <div className="splash"><img src="./logo-app-v3.png" alt="" /><strong>黑马记账</strong><span>正在准备你的账本…</span></div>
   }
   if (!statusQuery.data?.ready) {
     return (
@@ -55,7 +55,7 @@ export default function App(): React.JSX.Element {
       </main>
     )
   }
-  if (lockQuery.isLoading) return <div className="splash"><img src="./logo-app-v2.png" alt="" /><strong>黑马记账</strong><span>正在检查隐私保护…</span></div>
+  if (lockQuery.isLoading) return <div className="splash"><img src="./logo-app-v3.png" alt="" /><strong>黑马记账</strong><span>正在检查隐私保护…</span></div>
   if (lockQuery.data?.locked) return <LockScreen onUnlocked={async () => { await lockQuery.refetch(); await settingsQuery.refetch() }} />
 
   return (

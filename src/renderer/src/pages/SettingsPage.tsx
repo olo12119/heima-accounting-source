@@ -5,18 +5,12 @@ import { motion, useReducedMotion } from 'motion/react'
 import type { ColorTheme, ThemeMode } from '../../../shared/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { getErrorMessage } from '../lib/errors'
+import { MOOD_THEMES } from '../lib/theme-options'
 
 const themes: Array<{ value: ThemeMode; label: string; description: string; icon: React.ComponentType<{ size?: number }> }> = [
   { value: 'light', label: '浅色', description: '明亮清爽，适合白天', icon: Sun },
   { value: 'dark', label: '深色', description: '柔和护眼，适合夜晚', icon: Moon },
   { value: 'system', label: '跟随系统', description: '自动匹配电脑设置', icon: Laptop }
-]
-
-const colorThemes: Array<{ value: ColorTheme; label: string; description: string; colors: [string, string, string] }> = [
-  { value: 'forest', label: '黑曜鎏金', description: '深墨翡翠与克制金光', colors: ['#19664f', '#d6ab69', '#cf684e'] },
-  { value: 'ocean', label: '极光深海', description: '冷静海蓝与通透青光', colors: ['#316f8f', '#69a9b7', '#d47a67'] },
-  { value: 'amber', label: '琥珀日落', description: '温暖杏棕与珊瑚余晖', colors: ['#9b633d', '#d89a55', '#c96358'] },
-  { value: 'wisteria', label: '紫晶暮色', description: '紫晶层次与夜间氛围', colors: ['#6d5b91', '#a887b7', '#d17378'] }
 ]
 
 export function SettingsPage(): React.JSX.Element {
@@ -80,10 +74,10 @@ export function SettingsPage(): React.JSX.Element {
 
       <div className="settings-grid">
       <motion.section className="panel settings-section appearance-section" {...enter(0.06)}>
-        <div className="settings-heading"><div className="settings-icon"><Sun size={20} /></div><div><h2>外观模式</h2><p>选择一个让眼睛舒服的界面。</p></div></div>
-        <div className="setting-subheading"><strong>颜色主题</strong><span>主题与明暗可以自由组合</span></div>
+        <div className="settings-heading"><div className="settings-icon"><Sun size={20} /></div><div><h2>心情主题</h2><p>同一套操作方式，换一种今天喜欢的氛围。</p></div></div>
+        <div className="setting-subheading"><strong>完整视觉主题</strong><span>颜色、卡片、图标底座和动效会一起变化</span></div>
         <div className="palette-grid">
-          {colorThemes.map((palette) => {
+          {MOOD_THEMES.map((palette) => {
             const selected = settingsQuery.data?.colorTheme === palette.value
             return <button key={palette.value} className={selected ? 'selected' : ''} onClick={() => colorThemeMutation.mutate(palette.value)}>
               <span className="palette-preview">{palette.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
@@ -131,7 +125,7 @@ export function SettingsPage(): React.JSX.Element {
       </div>
 
       <motion.section className="about-strip" {...enter(0.25)}>
-        <img src="./logo-app-v2.png" alt="" />
+        <img src="./logo-app-v3.png" alt="" />
         <div><strong>黑马记账</strong><span>版本 {statusQuery.data?.version ?? '1.0.0'} · 本地个人收支账本</span></div>
         <span><BadgeCheck size={16} />数据由你保管</span>
         <span><Palette size={16} />界面可自由搭配</span>

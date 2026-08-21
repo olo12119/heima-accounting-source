@@ -10,9 +10,9 @@
 
 项目路径可以包含中文和空格，当前项目已经在该路径完成类型检查、测试、Electron 启动和构建。
 
-当前源码版本为1.4.0预览版。用户决定先体验功能再制作安装包，因此没有生成1.4.0 Windows安装版或单文件便携版，`release` 中仍是旧1.0.0/1.1.0产物。
+当前源码版本为1.5.0预览版。用户决定先体验功能再制作安装包，因此没有生成1.5.0 Windows安装版或单文件便携版，`release` 中仍是旧1.0.0/1.1.0产物。
 
-已经生成可直接打开的1.4.0免安装目录：`可直接打开-黑马记账-1.4.0预览版/win-unpacked`，共144个文件、约485.2MB。普通用户不应进入内部寻找EXE，直接双击根目录 `00-点我打开黑马记账-当前最新版.cmd`。
+已经生成可直接打开的1.5.0免安装目录：`可直接打开-黑马记账-1.5.0预览版/win-unpacked`，共143个文件、约488.2MB。普通用户不应进入内部寻找EXE，直接双击根目录 `00-点我打开黑马记账-当前最新版.cmd`。
 
 ## 安装依赖
 
@@ -54,13 +54,13 @@ npm run test:packaged
 ```powershell
 $env:ELECTRON_BUILDER_CACHE = "$PWD\.cache\electron-builder"
 npm.cmd run build
-npm.cmd exec electron-builder -- --dir --win --x64 "--config.directories.output=可直接打开-黑马记账-1.4.0预览版"
+npm.cmd exec electron-builder -- --dir --win --x64 "--config.directories.output=可直接打开-黑马记账-1.5.0预览版"
 ```
 
 测试当前免安装程序：
 
 ```powershell
-$env:HEIMA_PACKAGED_EXE = "$PWD\可直接打开-黑马记账-1.4.0预览版\win-unpacked\HeimaAccounting.exe"
+$env:HEIMA_PACKAGED_EXE = "$PWD\可直接打开-黑马记账-1.5.0预览版\win-unpacked\HeimaAccounting.exe"
 npm.cmd run test:packaged
 ```
 
@@ -78,7 +78,7 @@ npm run dist:win
 - `HeimaAccounting-Portable-1.1.0-x64.exe`：无需安装的便携版。
 - `win-unpacked\HeimaAccounting.exe`：解压运行目录中的主程序。
 
-在用户确认1.4.0预览版之前不要把上述文件误称为1.4.0安装版。确认后再执行 `npm run dist:win`，预期生成带1.4.0版本号的新文件。
+在用户确认1.5.0预览版之前不要把上述文件误称为1.5.0安装版。确认后再执行 `npm run dist:win`，预期生成带1.5.0版本号的新文件。
 
 当前产物没有代码签名证书，Windows SmartScreen 可能显示“未知发布者”。这是签名限制，不是程序损坏。
 
@@ -99,10 +99,10 @@ npm run dist:mac -- --x64
 
 ## 图标
 
-新版AI品牌原图经过项目脚本缩放为 `src/renderer/public/logo-app-v2.png` 与 `build/icon.png`。Windows 上可重新生成512像素构建图标：
+新版AI品牌原图经过项目脚本缩放为 `src/renderer/public/logo-app-v3.png` 与 `build/icon.png`。Windows 上可重新生成512像素构建图标：
 
 ```powershell
 npm run icons
 ```
 
-界面中的立体分类图标位于 `src/renderer/public/category-3d-atlas.png`。这是运行时资源，必须保留并由Git管理；它不是构建缓存，不应在清理项目时删除。
+界面中的立体分类图标位于 `src/renderer/public/category-3d-atlas-v2.png`。这是运行时资源，必须保留并由Git管理；它不是构建缓存，不应在清理项目时删除。

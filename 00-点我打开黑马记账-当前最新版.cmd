@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Heima Accounting 1.4.0 Preview
+title Heima Accounting 1.5.0 Preview
 set "ELECTRON_RUN_AS_NODE="
 
 set "APP_EXE="
-for /d %%D in ("%~dp0*1.4.0*") do if exist "%%~fD\win-unpacked\HeimaAccounting.exe" set "APP_EXE=%%~fD\win-unpacked\HeimaAccounting.exe"
+for /d %%D in ("%~dp0*1.5.0*") do if exist "%%~fD\win-unpacked\HeimaAccounting.exe" set "APP_EXE=%%~fD\win-unpacked\HeimaAccounting.exe"
 
 if "%HEIMA_LAUNCHER_CHECK%"=="1" (
   if defined APP_EXE echo FOUND=%APP_EXE%

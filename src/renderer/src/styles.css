@@ -952,3 +952,305 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
+/* 1.5 三套心情主题：同一套功能骨架，切换完整的色彩、圆角与空间气质 */
+:root {
+  --bg: #f3f2ed;
+  --surface: #fffdf9;
+  --surface-soft: #f7f6f1;
+  --surface-raised: #fffefa;
+  --text: #17231f;
+  --muted: #738079;
+  --border: #dde2dc;
+  --primary: #17624c;
+  --primary-hover: #104d3b;
+  --primary-soft: #e3f0e9;
+  --sidebar: #13251f;
+  --sidebar-gradient-start: #1b3d31;
+  --sidebar-gradient-end: #0d1c17;
+  --nav-accent: #d0a559;
+  --gold: #c99c4c;
+  --mood-radius: 20px;
+  --mood-lift: -3px;
+  --mood-chart: linear-gradient(145deg, #173b31, #245b49);
+  --hero-chart-text: #f7fff9;
+  --hero-chart-muted: rgba(247,255,249,.58);
+  --chart-income: #8ae2b7;
+  --chart-expense: #ffad91;
+  --primary-contrast: #ffffff;
+  --category-tile: #fffdf7;
+  --shadow: 0 15px 42px rgba(24, 52, 42, .075), 0 2px 8px rgba(24, 52, 42, .035);
+  --shadow-lg: 0 34px 90px rgba(14, 31, 25, .25);
+}
+
+:root[data-color-theme="amber"] {
+  --bg: #fff8e9;
+  --surface: #fffdf6;
+  --surface-soft: #fff4d8;
+  --surface-raised: #fffefa;
+  --text: #2a251c;
+  --muted: #817666;
+  --border: #eadcbf;
+  --primary: #d39312;
+  --primary-hover: #b87806;
+  --primary-soft: #ffebad;
+  --sidebar: #29261f;
+  --sidebar-gradient-start: #413b2d;
+  --sidebar-gradient-end: #201e19;
+  --nav-accent: #ffd164;
+  --gold: #d99a18;
+  --mood-radius: 17px;
+  --mood-lift: -4px;
+  --mood-chart: linear-gradient(145deg, #353128, #514936);
+  --chart-income: #a5e0a5;
+  --chart-expense: #ffb08d;
+  --primary-contrast: #282218;
+  --category-tile: #fffaf0;
+  --shadow: 0 14px 38px rgba(102, 73, 16, .085), 0 2px 7px rgba(77, 56, 16, .04);
+}
+
+:root[data-color-theme="wisteria"] {
+  --bg: #f6f4ef;
+  --surface: #fffdfb;
+  --surface-soft: #f1f2ed;
+  --surface-raised: #fffefe;
+  --text: #2b302d;
+  --muted: #7e8580;
+  --border: #dfe3df;
+  --primary: #718c7a;
+  --primary-hover: #5b7564;
+  --primary-soft: #e5ede7;
+  --sidebar: #27332e;
+  --sidebar-gradient-start: #3d4f47;
+  --sidebar-gradient-end: #202923;
+  --nav-accent: #f0b8c5;
+  --gold: #d8aa72;
+  --mood-radius: 24px;
+  --mood-lift: -2px;
+  --mood-chart: linear-gradient(145deg, #657b70, #81958b);
+  --chart-income: #d9f4c9;
+  --chart-expense: #ffd0dc;
+  --primary-contrast: #ffffff;
+  --category-tile: #fffafa;
+  --shadow: 0 17px 45px rgba(67, 82, 73, .07), 0 3px 12px rgba(113, 140, 122, .04);
+}
+
+:root[data-color-theme="ocean"] {
+  --mood-radius: 18px;
+  --mood-lift: -3px;
+  --mood-chart: linear-gradient(145deg, #204a5c, #326f85);
+  --hero-chart-text: #f5fcff;
+  --hero-chart-muted: rgba(245,252,255,.58);
+  --chart-income: #8ce0c6;
+  --chart-expense: #ffac9a;
+  --primary-contrast: #ffffff;
+  --category-tile: #f8fcfd;
+}
+
+:root[data-theme="dark"] {
+  --mood-chart: linear-gradient(145deg, #203e34, #2c594a);
+  --category-tile: #202b26;
+}
+:root[data-theme="dark"][data-color-theme="amber"] {
+  --mood-chart: linear-gradient(145deg, #3c3425, #5d4b2d);
+  --primary-contrast: #251d11;
+  --category-tile: #2b2119;
+}
+:root[data-theme="dark"][data-color-theme="wisteria"] {
+  --bg: #151916;
+  --surface: #202721;
+  --surface-soft: #273029;
+  --surface-raised: #2a332c;
+  --text: #f1f4f1;
+  --muted: #a5aea8;
+  --border: #37423a;
+  --primary: #a7c5ae;
+  --primary-hover: #b8d3be;
+  --primary-soft: #34443a;
+  --sidebar: #101713;
+  --mood-chart: linear-gradient(145deg, #4a5c52, #65796e);
+  --category-tile: #273029;
+}
+:root[data-theme="dark"][data-color-theme="ocean"] {
+  --mood-chart: linear-gradient(145deg, #1b3d4b, #285b6e);
+  --category-tile: #1b2a32;
+}
+
+body, .sidebar, .topbar, .panel, .expense-dialog, .category-dialog, .confirm-dialog {
+  transition: color .28s ease, background-color .28s ease, border-color .28s ease, box-shadow .28s ease;
+}
+body {
+  background:
+    radial-gradient(circle at 78% -14%, color-mix(in srgb, var(--primary) 11%, transparent), transparent 34%),
+    radial-gradient(circle at 22% 110%, color-mix(in srgb, var(--nav-accent) 8%, transparent), transparent 30%),
+    var(--bg);
+}
+.sidebar::before { animation: none; opacity: .78; }
+.topbar { height: 96px; padding-top: 20px; padding-bottom: 15px; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.add-button { color: var(--primary-contrast); }
+.button-shine { display: none; }
+.panel, .insight-card, .settings-overview, .palette-grid button { border-radius: var(--mood-radius); }
+.insight-card:hover, .category-manager-card:hover, .template-card:hover {
+  transform: translateY(var(--mood-lift));
+}
+
+/* 顶栏中的“换心情”：三套主主题可在任意页面直接切换 */
+.mood-picker { position: relative; z-index: 60; }
+.mood-trigger {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  box-shadow: 0 7px 20px color-mix(in srgb, var(--primary) 7%, transparent);
+  cursor: pointer;
+  font-weight: 720;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+.mood-trigger:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--primary) 42%, var(--border)); background: var(--surface); }
+.mood-trigger:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent); outline-offset: 2px; }
+.mood-popover {
+  width: 370px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  padding: 15px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-raised) 95%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  box-shadow: 0 24px 65px rgba(25, 36, 31, .2);
+  backdrop-filter: blur(18px);
+}
+.mood-popover-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 2px 3px 12px; }
+.mood-popover-heading > div { display: flex; flex-direction: column; gap: 4px; }
+.mood-popover-heading strong { font-size: 12px; }
+.mood-popover-heading span { color: var(--muted); font-size: 9px; }
+.mood-popover-heading > svg { color: var(--primary); }
+.mood-quick-grid { display: grid; gap: 7px; }
+.mood-quick-grid > button {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 46px 1fr 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface-soft);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+.mood-quick-grid > button:hover { transform: translateX(3px); border-color: var(--border); background: var(--surface); }
+.mood-quick-grid > button.selected { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); background: var(--primary-soft); }
+.mood-quick-grid > button > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mood-quick-grid strong { font-size: 10px; }
+.mood-quick-grid small { color: var(--muted); font-size: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mood-quick-grid > button > svg { color: var(--primary); }
+.mood-orb { width: 42px; height: 42px; display: flex; align-items: flex-end; gap: 3px; padding: 7px; border-radius: 14px; background: white; box-shadow: inset 0 0 0 1px rgba(30,42,36,.08), 0 6px 14px rgba(30,42,36,.08); overflow: hidden; }
+.mood-orb i { flex: 1; border-radius: 8px; }
+.mood-orb i:nth-child(1) { height: 100%; }
+.mood-orb i:nth-child(2) { height: 72%; }
+.mood-orb i:nth-child(3) { height: 45%; }
+.mood-popover > a { margin-top: 10px; min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--primary); border-top: 1px solid var(--border); padding-top: 10px; font-size: 9px; font-weight: 720; }
+
+/* 首页改为明亮的资产卡片 + 深色图表舱，不再依赖整块高饱和色 */
+.money-hero {
+  min-height: 272px;
+  grid-template-columns: .9fr 1.1fr;
+  color: var(--text);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-soft) 46%, var(--surface)) 0%, var(--surface) 58%, color-mix(in srgb, var(--nav-accent) 9%, var(--surface)) 100%);
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  border-radius: calc(var(--mood-radius) + 6px);
+  box-shadow: var(--shadow);
+}
+.money-hero::before, .money-hero::after { animation: none; }
+.money-hero::before { width: 220px; height: 220px; left: -130px; top: -140px; background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.money-hero::after { border-color: color-mix(in srgb, var(--gold) 14%, transparent); opacity: .75; }
+.money-hero-copy { padding: 32px 36px; }
+.hero-kicker { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 20%, var(--border)); }
+.money-hero-copy > p { margin-top: 24px; color: var(--muted); opacity: 1; }
+.money-hero-copy > strong.negative { color: var(--expense); }
+.hero-flow { color: var(--muted); }
+.hero-flow b { color: var(--income); }
+.hero-flow span:nth-child(2) b { color: var(--expense); }
+.money-hero-copy > button { color: var(--primary-contrast); background: var(--primary); box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 24%, transparent); }
+.money-hero-copy > button:hover { box-shadow: 0 14px 28px color-mix(in srgb, var(--primary) 28%, transparent); }
+.hero-chart {
+  margin: 14px;
+  padding: 22px 22px 13px;
+  color: var(--hero-chart-text);
+  background: var(--mood-chart);
+  border-radius: calc(var(--mood-radius) + 1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 35px color-mix(in srgb, var(--primary) 18%, transparent);
+  overflow: hidden;
+}
+.hero-chart::before { inset: 42px 13px 14px; border-color: rgba(255,255,255,.06); background: linear-gradient(140deg, rgba(255,255,255,.05), transparent); }
+.hero-chart small { color: var(--hero-chart-muted); opacity: 1; }
+.hero-chart .recharts-tooltip-wrapper .recharts-default-tooltip { color: #26312c !important; background: rgba(255,255,255,.94) !important; border: 0 !important; border-radius: 10px; box-shadow: 0 8px 22px rgba(0,0,0,.14); }
+
+/* 3D 分类资产：像一组精致的小物件，而不是一排扁平色块 */
+.category-icon-badge, .category-icon-tile, .legend-icon, .category-art {
+  background: linear-gradient(145deg, #ffffff, var(--category-tile)) !important;
+  border-color: color-mix(in srgb, currentColor 16%, var(--border));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 6px 13px color-mix(in srgb, currentColor 11%, transparent);
+}
+.category-icon-badge::after, .category-icon-tile::after, .category-art::after { opacity: .36; }
+.category-3d-icon { filter: saturate(.96) contrast(1.03) drop-shadow(0 4px 4px rgba(35,39,37,.13)); }
+.primary-grid button.selected .category-icon-tile {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 12%, white), color-mix(in srgb, var(--primary) 24%, white)) !important;
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 8px 18px color-mix(in srgb, var(--primary) 17%, transparent);
+}
+
+/* 记一笔：左侧负责金额和大类，右侧负责账目细节 */
+.expense-dialog { width: min(960px, 95vw); position: relative; overflow: hidden auto; border-radius: 24px; }
+.expense-dialog form { padding: 16px 22px 21px; }
+.entry-composer { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(330px, .92fr); gap: 16px; }
+.entry-primary-column, .entry-detail-column { min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 18px; }
+.entry-primary-column { background: linear-gradient(145deg, color-mix(in srgb, var(--primary-soft) 46%, var(--surface)), var(--surface)); }
+.entry-detail-column { background: var(--surface-soft); }
+.entry-type-switch { position: relative; isolation: isolate; overflow: hidden; }
+.entry-type-switch::before { content: ''; position: absolute; z-index: -1; left: 5px; top: 5px; width: calc(50% - 8px); height: calc(100% - 10px); border-radius: 9px; background: var(--surface); box-shadow: 0 4px 13px rgba(39,51,46,.1); transition: transform .3s cubic-bezier(.22,1,.36,1), background .25s ease; }
+.entry-type-switch[data-entry-type="income"]::before { transform: translateX(calc(100% + 6px)); background: color-mix(in srgb, var(--income-soft) 60%, var(--surface)); }
+.entry-type-switch button.active.expense, .entry-type-switch button.active.income { background: transparent; box-shadow: none; }
+.amount-field > div { min-height: 80px; border-radius: 17px; background: var(--surface); border-color: color-mix(in srgb, var(--primary) 20%, var(--border)); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+.amount-field input { font-size: 34px; }
+.primary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.primary-grid button { min-height: 76px; border-radius: 14px; }
+.secondary-fieldset { flex: 1; }
+.secondary-list label { background: var(--surface); }
+.form-footer { margin-top: 16px; }
+.save-success { position: absolute; z-index: 8; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text); background: color-mix(in srgb, var(--surface-raised) 88%, transparent); backdrop-filter: blur(15px); }
+.save-success > span { width: 66px; height: 66px; display: grid; place-items: center; color: var(--primary-contrast); background: var(--primary); border-radius: 22px; box-shadow: 0 16px 34px color-mix(in srgb, var(--primary) 27%, transparent); }
+.save-success strong { font-size: 17px; }
+.splash img { animation: logo-arrive .8s cubic-bezier(.34,1.56,.64,1); }
+
+@media (max-width: 980px) {
+  .expense-dialog { width: min(720px, 95vw); }
+  .entry-composer { grid-template-columns: 1fr; }
+  .primary-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+  .topbar { height: 91px; }
+  .money-hero { min-height: 430px; }
+  .hero-chart { margin: 0 14px 14px; padding: 14px 20px 10px; }
+  .mood-trigger span { display: none; }
+  .mood-trigger { width: 42px; justify-content: center; padding: 0; }
+  .mood-popover { width: min(370px, calc(100vw - 36px)); right: 0; }
+}
+
+@media (max-width: 620px) {
+  .topbar-actions { gap: 7px; }
+  .mood-popover { position: fixed; right: 18px; top: 78px; }
+  .entry-primary-column, .entry-detail-column { padding: 12px; }
+  .primary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

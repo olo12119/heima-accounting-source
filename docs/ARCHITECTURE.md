@@ -37,15 +37,18 @@ SQLite 还可能在数据库旁短暂保留 `-wal` 和 `-shm` 文件，它们是
 - `src/renderer/src/components`：导航、记账表单、确认框等可复用界面。
 - `src/renderer/src/pages`：首页、账单、统计、分类管理、数据与设置。
 - `src/renderer/src/components/AnimatedAmount.tsx`：金额从旧值平滑滚动到新值，并响应系统的“减少动画”设置。
-- `src/renderer/public/logo-app-v2.png`：AI绘制并缩放优化后的黑马鎏金应用图标。
-- `src/renderer/public/category-3d-atlas.png`：28格透明背景3D分类图标图集；界面按固定坐标裁切使用。
+- `src/renderer/src/lib/theme-options.ts`：心情主题名称、色板与快速切换范围的唯一清单。
+- `src/renderer/src/components/MoodThemePicker.tsx`：任意页面可用的心情主题快速切换器。
+- `src/renderer/public/logo-app-v3.png`：AI绘制的白瓷底黑马鎏金应用图标。
+- `src/renderer/public/category-3d-atlas-v2.png`：28格透明背景3D分类图标图集；界面按固定坐标裁切使用。
 - `tests`：纯逻辑、SQLite、React 交互和真实 Electron 操作测试。
 
 ## 界面与动效结构
 
 - 桌面使用侧边导航；窗口宽度低于860像素时切换为手机式底部导航和悬浮记账按钮。Electron最低窗口为760×640，未来手机端可以继续复用这套窄屏排版。
-- 品牌图标使用黑马、鎏金币与深墨绿的轻量3D视觉；分类继续使用原创黏土质感3D图集。
-- `motion` 负责页面进入、导航高亮、弹性弹窗、金额变化和账单删除补位；CSS负责按钮、卡片、环境光与图标微动效；Recharts负责图表绘制动画。
+- 固定程序图标使用白瓷底、黑马和克制鎏金；分类使用统一光照与材质的3D小物件图集。
+- 心情主题与明暗方式独立保存。黑马经典、暖阳活力、云朵治愈共享功能骨架，但分别改变背景、主色、卡片圆角、阴影和图表舱。
+- `motion` 负责页面进入、弹窗、金额变化、账单删除补位、主题选择器和记账完成反馈；CSS负责按钮、卡片与图标微动效；Recharts负责图表绘制动画。
 - 不使用“旧页必须退出后新页才进入”的串行动画。实际连续切页检查曾出现内容空白，因此改用新页立即进入的可靠方式。
 - `prefers-reduced-motion` 会关闭循环、位移和弹性效果，保证易眩晕用户仍可正常使用。
 

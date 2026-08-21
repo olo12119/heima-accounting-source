@@ -74,6 +74,6 @@ export function CategoryIcon({ name, size = 24, className, ...props }: { name: s
   const row = Math.floor(index / 7)
   return <span className={`category-3d-icon ${className ?? ''}`} style={{ width: numericSize, height: numericSize }} aria-hidden="true">
     <IconComponent className="category-vector-fallback" size={numericSize} weight="duotone" {...props} />
-    <img src="./category-3d-atlas.png" alt="" draggable={false} onError={(event) => { event.currentTarget.hidden = true }} style={{ width: numericSize * 7, height: numericSize * 4, left: -column * numericSize, top: -row * numericSize }} />
+    <img src="./category-3d-atlas-v2.png" alt="" draggable={false} onError={(event) => { event.currentTarget.hidden = true }} style={{ width: numericSize * 7, height: numericSize * 4, left: -column * numericSize, top: -row * numericSize }} />
   </span>
 }

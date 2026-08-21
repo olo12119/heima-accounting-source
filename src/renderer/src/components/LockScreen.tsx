@@ -16,7 +16,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => Promise<void> }):
   return <main className="lock-screen">
     <div className="lock-ambient" />
     <motion.form className="lock-card" onSubmit={unlock} initial={reduceMotion ? false : { opacity: 0, y: 24, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 24 }}>
-      <motion.img src="./logo-app-v2.png" alt="" initial={reduceMotion ? false : { scale: 0.7, rotate: -9 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.12, type: 'spring', stiffness: 240, damping: 17 }} />
+      <motion.img src="./logo-app-v3.png" alt="" initial={reduceMotion ? false : { scale: 0.7, rotate: -9 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.12, type: 'spring', stiffness: 240, damping: 17 }} />
       <span className="lock-badge"><ShieldCheck size={14} />本地隐私保护</span>
       <h1>欢迎回来</h1><p>输入隐私密码，打开你的本地账本。</p>
       <label><span><LockKeyhole size={15} />隐私密码</span><input autoFocus type="password" inputMode="numeric" pattern="[0-9]*" minLength={4} maxLength={12} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))} placeholder="4 至 12 位数字" aria-label="隐私密码" /></label>

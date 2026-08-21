@@ -1,7 +1,7 @@
 Add-Type -AssemblyName System.Drawing
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$source = Join-Path $projectRoot 'src\renderer\public\logo-app-v2.png'
+$source = Join-Path $projectRoot 'src\renderer\public\logo-app-v3.png'
 $buildDir = Join-Path $projectRoot 'build'
 $output = Join-Path $buildDir 'icon.png'
 

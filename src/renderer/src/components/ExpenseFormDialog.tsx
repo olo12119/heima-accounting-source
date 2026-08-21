@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, Clock3, Plus, Sparkles, X } from 'lucide-react'
-import { motion, useReducedMotion } from 'motion/react'
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, Check, Clock3, Plus, Sparkles, X } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { CategoryIcon } from './CategoryIcon'
 import { centsToInput, parseYuanToCents } from '../../../shared/money'
 import { formatLocalDate, formatLocalTime } from '../../../shared/dates'
@@ -32,6 +32,7 @@ const fallbackChoices = {
 export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | null | undefined; onClose: () => void }): React.JSX.Element {
   const reduceMotion = useReducedMotion()
   const [categoryCreator, setCategoryCreator] = useState<'primary' | 'secondary' | null>(null)
+  const [saved, setSaved] = useState(false)
   const queryClient = useQueryClient()
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: () => window.heima.getCategories() })
   const initial = useMemo<FormValues>(() => expense ? {
@@ -76,7 +77,12 @@ export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | nul
       const input: ExpenseInput = { entryType: values.entryType, amountCents, primaryCategoryId: values.primaryCategoryId, secondaryCategoryId: values.secondaryCategoryId, spentDate: values.spentDate, spentTime: values.spentTime, note: values.note.trim(), transactionKind: values.transactionKind, excludeFromStats: values.excludeFromStats, linkedExpenseId: values.linkedExpenseId || null }
       return expense ? window.heima.updateExpense(expense.id, input) : window.heima.createExpense(input)
     },
-    onSuccess: async () => { await queryClient.invalidateQueries(); onClose() }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries()
+      setSaved(true)
+      await new Promise((resolve) => window.setTimeout(resolve, reduceMotion ? 0 : 460))
+      onClose()
+    }
   })
   const typeLabel = entryType === 'income' ? '收入' : '支出'
 
@@ -84,21 +90,28 @@ export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | nul
     <motion.section className={`expense-dialog ${entryType}`} role="dialog" aria-modal="true" aria-labelledby="expense-title" initial={reduceMotion ? false : { opacity: 0, y: 30, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 28 }}>
       <div className="dialog-header"><div><span className="eyebrow">{expense ? '修改记录' : '快速记账'}</span><h2 id="expense-title">{expense ? `编辑这笔${typeLabel}` : `记一笔${typeLabel}`}</h2></div><button className="icon-button" aria-label="关闭" onClick={onClose}><X size={20} /></button></div>
       <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))}>
-        <div className="entry-type-switch" aria-label="收支类型">
+        <div className="entry-composer">
+        <div className="entry-primary-column">
+        <div className="entry-type-switch" data-entry-type={entryType} aria-label="收支类型">
           <button type="button" className={entryType === 'expense' ? 'active expense' : ''} onClick={() => selectType('expense')}><ArrowUpRight size={17} />支出</button>
           <button type="button" className={entryType === 'income' ? 'active income' : ''} onClick={() => selectType('income')}><ArrowDownLeft size={17} />收入</button>
         </div><input type="hidden" {...register('entryType')} />
         <label className="amount-field"><span>{typeLabel}金额</span><div><b>¥</b><input autoFocus inputMode="decimal" placeholder="0.00" aria-label="金额" {...register('amount', { required: '请输入金额', validate: (value) => parseYuanToCents(value) !== null || '请输入正确金额，最多保留两位小数' })} /></div>{errors.amount && <small className="field-error">{errors.amount.message}</small>}</label>
         <div className="quick-categories"><span className="field-label"><Sparkles size={14} /> 常用分类</span><div className="quick-list">{quickChoices.map((choice) => <button type="button" key={choice.secondaryCategoryId} onClick={() => { setValue('primaryCategoryId', choice.primaryCategoryId); setValue('secondaryCategoryId', choice.secondaryCategoryId) }}>{choice.secondaryCategoryName}</button>)}</div></div>
         <fieldset className="category-fieldset"><legend>一级分类 <button type="button" className="inline-add-category" onClick={() => setCategoryCreator('primary')}><Plus size={12} />新建</button></legend><input type="hidden" {...register('primaryCategoryId', { required: true })} /><div className="primary-grid">{primaryCategories.map((category) => <button type="button" key={category.id} className={primaryId === category.id ? 'selected' : ''} onClick={() => choosePrimary(category.id)}><span className="category-icon-tile" style={{ color: category.color, background: `${category.color}1f` }}><CategoryIcon name={category.icon} size={21} /></span><span>{category.name}</span></button>)}</div></fieldset>
+        </div>
+        <div className="entry-detail-column">
         <fieldset className="category-fieldset secondary-fieldset"><legend>二级分类 <button type="button" className="inline-add-category" onClick={() => setCategoryCreator('secondary')}><Plus size={12} />添加到当前分类</button></legend><div className="secondary-list">{secondaryCategories.map((category) => <label key={category.id} className={watch('secondaryCategoryId') === category.id ? 'selected' : ''}><input type="radio" value={category.id} {...register('secondaryCategoryId', { required: true })} />{category.name}</label>)}</div></fieldset>
         {entryType === 'income' && <div className="transaction-kind"><span className="field-label">这笔钱属于</span><div>{([['regular','普通收入'],['refund','消费退款'],['reimbursement','费用报销']] as Array<[TransactionKind,string]>).map(([value,label]) => <label className={transactionKind === value ? 'selected' : ''} key={value}><input type="radio" value={value} {...register('transactionKind')} />{label}</label>)}</div>{transactionKind !== 'regular' && <label><span>关联原支出</span><select aria-label="关联原支出" {...register('linkedExpenseId', { required: true })}><option value="">请选择需要冲减的支出</option>{linkableQuery.data?.map((item) => <option key={item.id} value={item.id}>{item.spentDate} · {item.secondaryCategoryName} · {centsToInput(item.amountCents)}</option>)}</select></label>}</div>}
         <label className="exclude-toggle"><input type="checkbox" {...register('excludeFromStats')} /><span><strong>不计入收支统计</strong><small>适合借还款等只想留痕、不想影响报表的记录</small></span></label>
         <div className="form-row"><label><span><CalendarDays size={15} /> 日期</span><input type="date" {...register('spentDate', { required: true })} /></label><label><span><Clock3 size={15} /> 时间</span><input type="time" {...register('spentTime', { required: true })} /></label></div>
         <label className="note-field"><span>备注 <em>可选</em></span><input placeholder={entryType === 'income' ? '例如：八月工资、差旅报销…' : '例如：午餐、超市采购…'} maxLength={200} {...register('note', { maxLength: 200 })} /></label>
+        </div>
+        </div>
         {saveMutation.isError && <div className="form-error" role="alert">{getErrorMessage(saveMutation.error)}</div>}
         <div className="form-footer"><span>按 Enter 快速保存</span><div><button type="button" className="button ghost" onClick={onClose}>取消</button><button type="submit" className="button primary wide" disabled={saveMutation.isPending}>{saveMutation.isPending ? '保存中…' : `保存${typeLabel}`}</button></div></div>
       </form>
+      <AnimatePresence>{saved && <motion.div className="save-success" role="status" initial={reduceMotion ? false : { opacity: 0, scale: 0.84 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}><motion.span initial={reduceMotion ? false : { scale: 0.35, rotate: -18 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 330, damping: 18 }}><Check size={28} /></motion.span><strong>{typeLabel}已记下</strong></motion.div>}</AnimatePresence>
     </motion.section>
     {categoryCreator && <QuickCategoryDialog kind={categoryCreator} entryType={entryType} parent={primaryCategories.find((category) => category.id === primaryId)} onClose={() => setCategoryCreator(null)} onCreated={async (primary, secondary) => { await queryClient.invalidateQueries({ queryKey: ['categories'] }); setValue('primaryCategoryId', primary.id); setValue('secondaryCategoryId', secondary.id); setCategoryCreator(null) }} />}
   </motion.div>
