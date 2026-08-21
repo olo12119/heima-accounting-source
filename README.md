@@ -18,6 +18,8 @@
 
 请直接阅读 [用户指南](docs/USER_GUIDE.md)。Windows 构建完成后，安装包和便携版位于 `release` 目录。
 
+如果你只是想知道项目里这些文件分别做什么、哪些不能删除，请看 [项目文件地图](docs/FILE_GUIDE.md)。
+
 ## 开发命令
 
 ```powershell
