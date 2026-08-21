@@ -21,6 +21,19 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'income-other': '#7b8796'
 }
 
+export const CATEGORY_COLOR_CHOICES = [
+  '#d98257', '#d65f67', '#b16b86', '#7667b8', '#5579a7',
+  '#3f88a8', '#3f8c88', '#2d9b72', '#8a7657', '#7c8580'
+] as const
+
+export const CATEGORY_ICON_NAMES = [
+  'utensils', 'car', 'shopping-bag', 'house', 'clapperboard', 'heart-pulse',
+  'book-open', 'wifi', 'gift', 'luggage', 'shapes', 'briefcase-business',
+  'badge-dollar-sign', 'store', 'chart-no-axes-combined', 'receipt-text',
+  'hand-coins', 'circle-dollar-sign', 'coffee', 'bus', 't-shirt', 'paw-print',
+  'baby', 'airplane', 'game-controller', 'graduation-cap', 'first-aid', 'wallet'
+] as const
+
 type CategoryDefinition = {
   id: string
   name: string
@@ -150,14 +163,21 @@ export const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
 ]
 
 export const CATEGORIES: Category[] = CATEGORY_DEFINITIONS.flatMap((primary, primaryIndex) => [
-  { id: primary.id, parentId: null, name: primary.name, icon: primary.icon, sortOrder: primaryIndex, entryType: primary.entryType },
+  {
+    id: primary.id, parentId: null, name: primary.name, icon: primary.icon,
+    color: CATEGORY_COLORS[primary.id] ?? '#7c8580', sortOrder: primaryIndex,
+    entryType: primary.entryType, isSystem: true, isActive: true
+  },
   ...primary.children.map((secondary, secondaryIndex) => ({
     id: secondary.id,
     parentId: primary.id,
     name: secondary.name,
     icon: primary.icon,
+    color: CATEGORY_COLORS[primary.id] ?? '#7c8580',
     sortOrder: secondaryIndex,
-    entryType: primary.entryType
+    entryType: primary.entryType,
+    isSystem: true,
+    isActive: true
   }))
 ])
 

@@ -43,6 +43,62 @@ describe('SQLite 账本', () => {
     database.close()
   })
 
+  it('允许创建和编辑自定义分类，但锁定系统预设分类', () => {
+    const { database } = createDatabase()
+    const primary = database.createCustomPrimaryCategory({
+      entryType: 'expense', name: '家庭生活', firstSecondaryName: '家庭日用', icon: 'house', color: '#5579a7'
+    })
+    expect(primary.isSystem).toBe(false)
+    const firstChild = database.getCategoriesForManagement().find((category) => category.parentId === primary.id)
+    expect(firstChild?.name).toBe('家庭日用')
+
+    const secondary = database.createCustomSecondaryCategory({ parentId: 'food', name: '公司食堂' })
+    expect(secondary.parentId).toBe('food')
+    expect(secondary.isSystem).toBe(false)
+
+    const updated = database.updateCustomCategory(primary.id, { name: '家庭开销', icon: 'wallet', color: '#7667b8' })
+    expect(updated.name).toBe('家庭开销')
+    expect(updated.icon).toBe('wallet')
+    expect(database.getCategoriesForManagement().find((category) => category.id === firstChild?.id)?.color).toBe('#7667b8')
+    expect(() => database.updateCustomCategory('food', { name: '吃饭' })).toThrow('系统预设分类不能修改')
+    database.close()
+  })
+
+  it('删除未使用的自定义分类，并安全停用已有账目的分类', () => {
+    const { database } = createDatabase()
+    const unused = database.createCustomPrimaryCategory({
+      entryType: 'expense', name: '临时分类', firstSecondaryName: '临时二级', icon: 'shapes', color: '#7c8580'
+    })
+    expect(database.deleteCustomCategory(unused.id).mode).toBe('deleted')
+    expect(database.getCategoriesForManagement().some((category) => category.id === unused.id)).toBe(false)
+
+    const used = database.createCustomPrimaryCategory({
+      entryType: 'expense', name: '家庭生活', firstSecondaryName: '家庭日用', icon: 'house', color: '#5579a7'
+    })
+    const child = database.getCategories().find((category) => category.parentId === used.id)!
+    database.createExpense(todayInput({ primaryCategoryId: used.id, secondaryCategoryId: child.id, note: '家庭采购' }))
+    expect(database.deleteCustomCategory(used.id).mode).toBe('deactivated')
+    expect(database.getCategories().some((category) => category.id === used.id)).toBe(false)
+    expect(database.listExpenses('all')[0]?.primaryCategoryName).toBe('家庭生活')
+    expect(database.getCategoriesForManagement().find((category) => category.id === used.id)?.isActive).toBe(false)
+    database.close()
+  })
+
+  it('只在自定义同级分类之间调整顺序', () => {
+    const { database } = createDatabase()
+    const first = database.createCustomPrimaryCategory({
+      entryType: 'income', name: '自定义甲', firstSecondaryName: '甲明细', icon: 'wallet', color: '#2d9b72'
+    })
+    const second = database.createCustomPrimaryCategory({
+      entryType: 'income', name: '自定义乙', firstSecondaryName: '乙明细', icon: 'hand-coins', color: '#3f8c88'
+    })
+    database.reorderCustomCategory(second.id, 'up')
+    const customPrimaries = database.getCategoriesForManagement().filter((category) =>
+      !category.isSystem && category.parentId === null && category.entryType === 'income')
+    expect(customPrimaries.map((category) => category.id)).toEqual([second.id, first.id])
+    database.close()
+  })
+
   it('新增、修改、筛选和删除账目', () => {
     const { database } = createDatabase()
     const created = database.createExpense(todayInput())
@@ -126,12 +182,37 @@ describe('SQLite 账本', () => {
     const { database } = createDatabase()
     const original = database.createExpense(todayInput())
     database.setTheme('dark')
+    database.setColorTheme('ocean')
     const backup = database.getBackupPayload()
     database.createExpense(todayInput({ amountCents: 999 }))
     database.setTheme('light')
     database.replaceFromBackup(backup)
     expect(database.listExpenses('all').map((expense) => expense.id)).toEqual([original.id])
     expect(database.getSettings().theme).toBe('dark')
+    expect(database.getSettings().colorTheme).toBe('ocean')
+    database.close()
+  })
+
+  it('完整备份包含自定义分类，错误恢复会整体回滚', () => {
+    const { database } = createDatabase()
+    const primary = database.createCustomPrimaryCategory({
+      entryType: 'expense', name: '家庭生活', firstSecondaryName: '家庭日用', icon: 'house', color: '#5579a7'
+    })
+    const secondary = database.getCategories().find((category) => category.parentId === primary.id)!
+    const original = database.createExpense(todayInput({ primaryCategoryId: primary.id, secondaryCategoryId: secondary.id }))
+    const backup = database.getBackupPayload()
+    expect(backup.categories).toHaveLength(2)
+
+    database.createExpense(todayInput({ amountCents: 999 }))
+    database.replaceFromBackup(backup)
+    expect(database.listExpenses('all').map((expense) => expense.id)).toEqual([original.id])
+    expect(database.getCategories().some((category) => category.id === primary.id)).toBe(true)
+
+    const invalid = structuredClone(backup)
+    invalid.expenses[0]!.secondaryCategoryId = 'missing.category'
+    expect(() => database.replaceFromBackup(invalid)).toThrow('不匹配')
+    expect(database.listExpenses('all').map((expense) => expense.id)).toEqual([original.id])
+    expect(database.getCategories().some((category) => category.id === primary.id)).toBe(true)
     database.close()
   })
 })

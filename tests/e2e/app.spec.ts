@@ -13,7 +13,7 @@ const launchApp = async (userData: string): Promise<{ app: ElectronApplication; 
   const exportDirectory = join(userData, 'test-exports')
   const app = await electron.launch({
     executablePath,
-    args: ['.'],
+    args: ['.', '--disable-gpu', '--no-sandbox'],
     cwd: root,
     env: {
       ...cleanEnvironment(),
@@ -35,8 +35,21 @@ test('新增、编辑、筛选、删除确认、主题和重启持久化', async
     await expect(page).toHaveTitle('黑马记账')
     await expect(page.getByText('还没有账目')).toBeVisible()
 
+    await page.getByRole('link', { name: '分类管理' }).click()
+    await page.getByRole('button', { name: /新增一级分类/ }).click()
+    await page.getByLabel('一级分类名称').fill('家庭生活')
+    await page.getByLabel('第一个二级分类').fill('家庭日用')
+    await page.getByRole('button', { name: '选择房屋图标' }).click()
+    await page.getByRole('button', { name: '保存分类' }).click()
+    await expect(page.getByRole('dialog', { name: '新增一级分类' })).toBeHidden()
+    const customCategoryCard = page.locator('.category-manager-card').filter({ hasText: '家庭生活' })
+    await expect(customCategoryCard).toBeVisible()
+    await customCategoryCard.screenshot({ path: join(root, 'test-results', 'categories-manager.png') })
+
+    await page.getByRole('link', { name: '首页' }).click()
     await page.getByRole('button', { name: '记一笔' }).first().click()
     await page.getByLabel('金额').fill('12.50')
+    await page.getByRole('button', { name: '家庭生活' }).click()
     await page.getByPlaceholder('例如：午餐、超市采购…').fill('测试午餐')
     await page.getByRole('button', { name: '保存支出' }).click()
     await expect(page.getByText('测试午餐')).toBeVisible()
@@ -45,7 +58,7 @@ test('新增、编辑、筛选、删除确认、主题和重启持久化', async
 
     await page.getByRole('link', { name: '账单' }).click()
     await expect(page.getByText('测试午餐')).toBeVisible()
-    await page.getByRole('button', { name: '编辑正餐' }).click()
+    await page.getByRole('button', { name: '编辑家庭日用' }).click()
     await page.getByLabel('金额').fill('20.88')
     await page.getByRole('button', { name: '保存支出' }).click()
     await expect(page.locator('.records-panel .expense-amount')).toHaveText('−¥20.88')
@@ -67,13 +80,17 @@ test('新增、编辑、筛选、删除确认、主题和重启持久化', async
     const csvPath = join(exportDirectory, exportedFiles.find((name) => name.endsWith('.csv'))!)
     const backupPath = join(exportDirectory, exportedFiles.find((name) => name.endsWith('.heima-backup.json'))!)
     expect(readFileSync(csvPath, 'utf8')).toContain('20.88')
+    expect(readFileSync(csvPath, 'utf8')).toContain('家庭生活,家庭日用')
+    const backupDocument = JSON.parse(readFileSync(backupPath, 'utf8')) as { schemaVersion: number; payload: { categories: Array<{ name: string }> } }
+    expect(backupDocument.schemaVersion).toBe(3)
+    expect(backupDocument.payload.categories.some((category) => category.name === '家庭生活')).toBe(true)
 
     await page.getByRole('link', { name: '账单' }).click()
 
-    await page.getByRole('button', { name: '删除正餐' }).click()
+    await page.getByRole('button', { name: '删除家庭日用' }).click()
     await page.getByRole('button', { name: '取消' }).click()
     await expect(page.locator('.records-panel .expense-amount')).toHaveText('−¥20.88')
-    await page.getByRole('button', { name: '删除正餐' }).click()
+    await page.getByRole('button', { name: '删除家庭日用' }).click()
     await page.getByRole('button', { name: '确认删除' }).click()
     await expect(page.getByText('这个时间段还没有账目')).toBeVisible()
 
@@ -84,8 +101,18 @@ test('新增、编辑、筛选、删除确认、主题和重启持久化', async
     await expect(page.getByText(/已恢复 1 笔账目/)).toBeVisible()
     expect(readdirSync(join(userData, 'backups')).some((name) => name.startsWith('恢复前自动备份'))).toBe(true)
 
+    await page.getByRole('button', { name: /雾蓝海岸/ }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'ocean')
     await page.getByRole('button', { name: /深色/ }).click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.getByRole('button', { name: /暖杏琥珀/ }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'amber')
+    await page.getByRole('button', { name: /紫藤暮色/ }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-color-theme', 'wisteria')
+    await page.screenshot({ path: join(root, 'test-results', 'theme-wisteria-dark.png'), fullPage: true })
+
+    await page.getByRole('link', { name: '分类管理' }).click()
+    await expect(page.getByText('家庭生活').first()).toBeVisible()
 
     await page.getByRole('link', { name: '首页' }).click()
     await page.getByRole('button', { name: '记一笔' }).first().click()

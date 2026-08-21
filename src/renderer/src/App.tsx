@@ -7,12 +7,14 @@ import { DashboardPage } from './pages/DashboardPage'
 import { RecordsPage } from './pages/RecordsPage'
 import { StatisticsPage } from './pages/StatisticsPage'
 import { SettingsPage } from './pages/SettingsPage'
-import type { ThemeMode } from '../../shared/types'
+import { CategoriesPage } from './pages/CategoriesPage'
+import type { ColorTheme, ThemeMode } from '../../shared/types'
 
-const applyTheme = (mode: ThemeMode): (() => void) => {
+const applyTheme = (mode: ThemeMode, colorTheme: ColorTheme): (() => void) => {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
   const update = (): void => {
     document.documentElement.dataset.theme = mode === 'system' ? (media.matches ? 'dark' : 'light') : mode
+    document.documentElement.dataset.colorTheme = colorTheme
   }
   update()
   media.addEventListener('change', update)
@@ -26,7 +28,10 @@ export default function App(): React.JSX.Element {
     queryFn: () => window.heima.getSettings(),
     enabled: statusQuery.data?.ready === true
   })
-  useEffect(() => applyTheme(settingsQuery.data?.theme ?? 'system'), [settingsQuery.data?.theme])
+  useEffect(() => applyTheme(
+    settingsQuery.data?.theme ?? 'system',
+    settingsQuery.data?.colorTheme ?? 'forest'
+  ), [settingsQuery.data?.theme, settingsQuery.data?.colorTheme])
 
   if (statusQuery.isLoading) {
     return <div className="splash"><img src="./logo.svg" alt="" /><strong>黑马记账</strong><span>正在准备你的账本…</span></div>
@@ -51,6 +56,7 @@ export default function App(): React.JSX.Element {
         <Route index element={<DashboardPage />} />
         <Route path="records" element={<RecordsPage />} />
         <Route path="statistics" element={<StatisticsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, DatabaseBackup, Download, FileSpreadsheet, HardDrive, Laptop, Moon, RotateCcw, Sun } from 'lucide-react'
-import type { ThemeMode } from '../../../shared/types'
+import type { ColorTheme, ThemeMode } from '../../../shared/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { getErrorMessage } from '../lib/errors'
 
@@ -9,6 +9,13 @@ const themes: Array<{ value: ThemeMode; label: string; description: string; icon
   { value: 'light', label: '浅色', description: '明亮清爽，适合白天', icon: Sun },
   { value: 'dark', label: '深色', description: '柔和护眼，适合夜晚', icon: Moon },
   { value: 'system', label: '跟随系统', description: '自动匹配电脑设置', icon: Laptop }
+]
+
+const colorThemes: Array<{ value: ColorTheme; label: string; description: string; colors: [string, string, string] }> = [
+  { value: 'forest', label: '黑马墨绿', description: '沉稳、清晰的品牌配色', colors: ['#19664f', '#d6ab69', '#cf684e'] },
+  { value: 'ocean', label: '雾蓝海岸', description: '安静清爽的蓝灰气息', colors: ['#316f8f', '#69a9b7', '#d47a67'] },
+  { value: 'amber', label: '暖杏琥珀', description: '温暖柔和的生活感', colors: ['#9b633d', '#d89a55', '#c96358'] },
+  { value: 'wisteria', label: '紫藤暮色', description: '克制精致的灰紫色', colors: ['#6d5b91', '#a887b7', '#d17378'] }
 ]
 
 export function SettingsPage(): React.JSX.Element {
@@ -19,6 +26,10 @@ export function SettingsPage(): React.JSX.Element {
   const statusQuery = useQuery({ queryKey: ['status'], queryFn: () => window.heima.getStatus(), staleTime: Infinity })
   const themeMutation = useMutation({
     mutationFn: (theme: ThemeMode) => window.heima.setTheme(theme),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['settings'] })
+  })
+  const colorThemeMutation = useMutation({
+    mutationFn: (colorTheme: ColorTheme) => window.heima.setColorTheme(colorTheme),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['settings'] })
   })
   const operation = useMutation({
@@ -44,6 +55,17 @@ export function SettingsPage(): React.JSX.Element {
     <div className="settings-grid">
       <section className="panel settings-section appearance-section">
         <div className="settings-heading"><div className="settings-icon"><Sun size={20} /></div><div><h2>外观模式</h2><p>选择一个让眼睛舒服的界面。</p></div></div>
+        <div className="setting-subheading"><strong>颜色主题</strong><span>主题与明暗可以自由组合</span></div>
+        <div className="palette-grid">
+          {colorThemes.map((palette) => {
+            const selected = settingsQuery.data?.colorTheme === palette.value
+            return <button key={palette.value} className={selected ? 'selected' : ''} onClick={() => colorThemeMutation.mutate(palette.value)}>
+              <span className="palette-preview">{palette.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
+              <span><strong>{palette.label}</strong><small>{palette.description}</small></span>{selected && <Check className="theme-check" size={17} />}
+            </button>
+          })}
+        </div>
+        <div className="setting-subheading"><strong>明暗方式</strong><span>“跟随系统”会随电脑自动切换</span></div>
         <div className="theme-grid">
           {themes.map((theme) => {
             const Icon = theme.icon

@@ -14,7 +14,7 @@ const canonicalize = (value: unknown): unknown => {
   return value
 }
 
-export const hashPayload = (payload: BackupPayload): string =>
+export const hashPayload = (payload: unknown): string =>
   createHash('sha256').update(JSON.stringify(canonicalize(payload)), 'utf8').digest('hex')
 
 export const createBackupDocument = (
@@ -25,7 +25,7 @@ export const createBackupDocument = (
   const snapshot = structuredClone(payload)
   return {
     magic: 'heima-accounting-backup',
-    schemaVersion: 2,
+    schemaVersion: 3,
     appVersion,
     exportedAt,
     checksum: hashPayload(snapshot),
@@ -35,14 +35,25 @@ export const createBackupDocument = (
 
 export const parseBackupDocument = (raw: string): BackupDocument => {
   const parsed = JSON.parse(raw) as Record<string, unknown>
-  const rawPayload = parsed.payload as BackupPayload
+  const rawPayload = parsed.payload
   if (hashPayload(rawPayload) !== parsed.checksum) {
     throw new Error('备份校验失败，文件可能不完整或已被修改')
   }
-  if (parsed.schemaVersion === 1 && rawPayload && Array.isArray(rawPayload.expenses)) {
+  if (rawPayload && typeof rawPayload === 'object') {
+    const payload = rawPayload as Record<string, unknown>
+    const expenses = Array.isArray(payload.expenses) ? payload.expenses : []
     parsed.payload = {
-      ...rawPayload,
-      expenses: rawPayload.expenses.map((expense) => ({ ...(expense as unknown as Record<string, unknown>), entryType: 'expense' }))
+      ...payload,
+      categories: parsed.schemaVersion === 3 && Array.isArray(payload.categories) ? payload.categories : [],
+      expenses: parsed.schemaVersion === 1
+        ? expenses.map((expense) => ({ ...(expense as Record<string, unknown>), entryType: 'expense' }))
+        : expenses,
+      settings: {
+        ...(payload.settings as Record<string, unknown>),
+        colorTheme: parsed.schemaVersion === 3
+          ? (payload.settings as Record<string, unknown>)?.colorTheme
+          : 'forest'
+      }
     }
   }
   return backupDocumentSchema.parse(parsed)

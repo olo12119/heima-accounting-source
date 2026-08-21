@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createBackupDocument, createExpensesCsv, parseBackupDocument } from '../../src/main/data-formats'
+import { createBackupDocument, createExpensesCsv, hashPayload, parseBackupDocument } from '../../src/main/data-formats'
 import type { BackupPayload, Expense } from '../../src/shared/types'
 
 const payload: BackupPayload = {
+  categories: [],
   expenses: [{
     id: '2ef99495-7651-493c-a0d6-aaa0cc968523',
     entryType: 'expense',
@@ -15,12 +16,13 @@ const payload: BackupPayload = {
     createdAt: '2026-08-20T04:30:00.000Z',
     updatedAt: '2026-08-20T04:30:00.000Z'
   }],
-  settings: { theme: 'system' }
+  settings: { theme: 'system', colorTheme: 'forest' }
 }
 
 describe('完整备份格式', () => {
   it('生成可校验和可恢复的版本化备份', () => {
     const document = createBackupDocument(payload, '1.0.0', '2026-08-20T05:00:00.000Z')
+    expect(document.schemaVersion).toBe(3)
     expect(document.checksum).toMatch(/^[a-f0-9]{64}$/)
     expect(parseBackupDocument(JSON.stringify(document)).payload).toEqual(payload)
   })
@@ -40,6 +42,21 @@ describe('完整备份格式', () => {
     }
     legacyDocument.checksum = createBackupDocument(legacyPayload as unknown as BackupPayload, '1.0.0').checksum
     expect(parseBackupDocument(JSON.stringify(legacyDocument)).payload.expenses[0]?.entryType).toBe('expense')
+    expect(parseBackupDocument(JSON.stringify(legacyDocument)).payload.settings.colorTheme).toBe('forest')
+  })
+
+  it('兼容没有自定义分类和颜色主题的第2版备份', () => {
+    const legacyPayload = {
+      expenses: payload.expenses,
+      settings: { theme: 'dark' }
+    }
+    const legacyDocument = {
+      magic: 'heima-accounting-backup', schemaVersion: 2, appVersion: '1.1.0',
+      exportedAt: '2026-08-20T05:00:00.000Z', checksum: hashPayload(legacyPayload), payload: legacyPayload
+    }
+    const restored = parseBackupDocument(JSON.stringify(legacyDocument)).payload
+    expect(restored.categories).toEqual([])
+    expect(restored.settings).toEqual({ theme: 'dark', colorTheme: 'forest' })
   })
 })
 
@@ -49,6 +66,8 @@ describe('CSV 格式', () => {
       ...payload.expenses[0]!,
       primaryCategoryName: '餐饮',
       secondaryCategoryName: '正餐',
+      primaryCategoryIcon: 'utensils',
+      primaryCategoryColor: '#d98257',
       note: '午餐,"套餐"'
     }
     const csv = createExpensesCsv([expense])

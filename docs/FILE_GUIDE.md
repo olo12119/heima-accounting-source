@@ -8,6 +8,7 @@
    - 安装版：`HeimaAccounting-Setup-1.1.0-x64.exe`
    - 免安装便携版：`HeimaAccounting-Portable-1.1.0-x64.exe`
    - `win-unpacked` 是用于开发检查的解压运行目录，普通使用不必进入。
+   - 这些仍是1.1.0成品；当前1.2.0源码按照用户要求先体验、后打包，可使用 `npm.cmd run dev` 打开预览版。
 2. **想学习软件怎样使用**：阅读 [用户指南](USER_GUIDE.md)。
 3. **想知道项目现在做到哪里**：先看根目录的 [README](../README.md)，详细过程看 [开发日志](DEVELOPMENT_LOG.md)。
 

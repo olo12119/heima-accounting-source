@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit3, Trash2 } from 'lucide-react'
-import { CATEGORIES } from '../../../shared/categories'
 import { formatCents } from '../../../shared/money'
 import { formatDisplayDate } from '../../../shared/dates'
 import type { EntryTypeFilter, Expense, RangePreset } from '../../../shared/types'
@@ -17,8 +16,6 @@ const ranges: Array<{ value: RangePreset; label: string }> = [
 const types: Array<{ value: EntryTypeFilter; label: string }> = [
   { value: 'all', label: '全部收支' }, { value: 'expense', label: '仅支出' }, { value: 'income', label: '仅收入' }
 ]
-const iconFor = (categoryId: string): string => CATEGORIES.find((category) => category.id === categoryId)?.icon ?? 'shapes'
-
 export function RecordsPage(): React.JSX.Element {
   const [preset, setPreset] = useState<RangePreset>('month')
   const [entryType, setEntryType] = useState<EntryTypeFilter>('all')
@@ -47,7 +44,7 @@ export function RecordsPage(): React.JSX.Element {
         const dayIncome = entries.filter((item) => item.entryType === 'income').reduce((sum, item) => sum + item.amountCents, 0)
         const dayExpense = entries.filter((item) => item.entryType === 'expense').reduce((sum, item) => sum + item.amountCents, 0)
         return <div className="date-group" key={date}><div className="date-heading"><strong>{formatDisplayDate(date)}</strong><span><em>收 {formatCents(dayIncome)}</em> · 支 {formatCents(dayExpense)}</span></div><div className="expense-list">{entries.map((entry) => <div className="expense-row" key={entry.id}>
-          <span className="category-icon-badge" data-category={entry.primaryCategoryId}><CategoryIcon name={iconFor(entry.primaryCategoryId)} size={18} strokeWidth={1.9} /></span>
+          <span className="category-icon-badge" style={{ color: entry.primaryCategoryColor, background: `${entry.primaryCategoryColor}1f` }}><CategoryIcon name={entry.primaryCategoryIcon} size={20} /></span>
           <span className="expense-time">{entry.spentTime}</span><span className="expense-info"><strong>{entry.secondaryCategoryName}</strong><small>{entry.note || entry.primaryCategoryName}</small></span>
           <span className="entry-type-pill" data-type={entry.entryType}>{entry.entryType === 'income' ? '收入' : '支出'}</span>
           <strong className={`expense-amount ${entry.entryType}`}>{entry.entryType === 'income' ? '+' : '−'}{formatCents(entry.amountCents)}</strong>

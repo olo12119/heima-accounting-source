@@ -1,6 +1,21 @@
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import { ipcMain } from 'electron'
-import { entryTypeFilterSchema, entryTypeSchema, expenseIdSchema, expenseInputSchema, rangePresetSchema, statisticsPresetSchema, themeModeSchema } from '../shared/schemas'
+import { z } from 'zod'
+import {
+  categoryOrderDirectionSchema,
+  colorThemeSchema,
+  customCategoryIdSchema,
+  customCategoryUpdateSchema,
+  customPrimaryCategoryInputSchema,
+  customSecondaryCategoryInputSchema,
+  entryTypeFilterSchema,
+  entryTypeSchema,
+  expenseIdSchema,
+  expenseInputSchema,
+  rangePresetSchema,
+  statisticsPresetSchema,
+  themeModeSchema
+} from '../shared/schemas'
 import type { AppStatus } from '../shared/types'
 import type { AccountingDatabase } from './database'
 import { exportBackup, exportCsv, restoreBackup } from './portability'
@@ -38,7 +53,20 @@ export const registerIpcHandlers = (dependencies: IpcDependencies): void => {
     return dependencies.getStatus()
   })
   handle('categories:list', (database) => database.getCategories())
+  handle('categories:manage-list', (database) => database.getCategoriesForManagement())
   handle('categories:frequent', (database, entryType: unknown) => database.getFrequentCategories(entryTypeSchema.parse(entryType)))
+  handle('categories:create-primary', (database, input: unknown) =>
+    database.createCustomPrimaryCategory(customPrimaryCategoryInputSchema.parse(input)))
+  handle('categories:create-secondary', (database, input: unknown) =>
+    database.createCustomSecondaryCategory(customSecondaryCategoryInputSchema.parse(input)))
+  handle('categories:update', (database, id: unknown, input: unknown) =>
+    database.updateCustomCategory(customCategoryIdSchema.parse(id), customCategoryUpdateSchema.parse(input)))
+  handle('categories:set-active', (database, id: unknown, active: unknown) =>
+    database.setCustomCategoryActive(customCategoryIdSchema.parse(id), z.boolean().parse(active)))
+  handle('categories:delete', (database, id: unknown) =>
+    database.deleteCustomCategory(customCategoryIdSchema.parse(id)))
+  handle('categories:reorder', (database, id: unknown, direction: unknown) =>
+    database.reorderCustomCategory(customCategoryIdSchema.parse(id), categoryOrderDirectionSchema.parse(direction)))
   handle('expenses:list', (database, preset: unknown, entryType: unknown = 'all') =>
     database.listExpenses(rangePresetSchema.parse(preset), entryTypeFilterSchema.parse(entryType)))
   handle('expenses:create', (database, input: unknown) => database.createExpense(expenseInputSchema.parse(input)))
@@ -50,6 +78,7 @@ export const registerIpcHandlers = (dependencies: IpcDependencies): void => {
     database.getStatistics(statisticsPresetSchema.parse(preset), entryTypeSchema.parse(entryType)))
   handle('settings:get', (database) => database.getSettings())
   handle('settings:set-theme', (database, theme: unknown) => database.setTheme(themeModeSchema.parse(theme)))
+  handle('settings:set-color-theme', (database, colorTheme: unknown) => database.setColorTheme(colorThemeSchema.parse(colorTheme)))
   handle('data:export-csv', async (database) => {
     const window = dependencies.getWindow()
     if (!window) throw new Error('应用窗口不可用')

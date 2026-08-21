@@ -2,15 +2,28 @@ import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import { mkdirSync } from 'node:fs'
-import { CATEGORIES, getCategoryColor } from '../shared/categories'
+import { CATEGORIES } from '../shared/categories'
 import { enumerateDates, formatLocalDate, getPresetRange } from '../shared/dates'
-import { expenseInputSchema } from '../shared/schemas'
+import {
+  backupPayloadSchema,
+  customCategoryUpdateSchema,
+  customPrimaryCategoryInputSchema,
+  customSecondaryCategoryInputSchema,
+  expenseInputSchema
+} from '../shared/schemas'
 import type {
   AppSettings,
+  BackupCategory,
   BackupExpense,
   BackupPayload,
   Category,
+  CategoryDeleteResult,
+  CategoryManagementItem,
   CategoryTotal,
+  ColorTheme,
+  CustomCategoryUpdate,
+  CustomPrimaryCategoryInput,
+  CustomSecondaryCategoryInput,
   DashboardSummary,
   EntryType,
   EntryTypeFilter,
@@ -35,18 +48,36 @@ type ExpenseRow = {
   updated_at: string
   primary_category_name: string
   secondary_category_name: string
+  primary_category_icon: string
+  primary_category_color: string
+}
+
+type CategoryRow = {
+  id: string
+  parent_id: string | null
+  name: string
+  icon: string
+  color: string
+  sort_order: number
+  entry_type: EntryType
+  is_system: number
+  is_active: number
+  usage_count?: number
 }
 
 type CategoryTotalRow = {
   category_id: string
   category_name: string
   amount_cents: number
+  color: string
+  icon: string
 }
 
 const expenseSelect = `
   SELECT e.id, e.entry_type, e.amount_cents, e.primary_category_id, e.secondary_category_id,
          e.spent_date, e.spent_time, e.note, e.created_at, e.updated_at,
-         p.name AS primary_category_name, s.name AS secondary_category_name
+         p.name AS primary_category_name, s.name AS secondary_category_name,
+         p.icon AS primary_category_icon, p.color AS primary_category_color
   FROM expenses e
   JOIN categories p ON p.id = e.primary_category_id
   JOIN categories s ON s.id = e.secondary_category_id
@@ -79,6 +110,7 @@ export class AccountingDatabase {
         parent_id TEXT REFERENCES categories(id),
         name TEXT NOT NULL,
         icon TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#7c8580',
         sort_order INTEGER NOT NULL,
         entry_type TEXT NOT NULL DEFAULT 'expense' CHECK(entry_type IN ('expense', 'income')),
         is_system INTEGER NOT NULL DEFAULT 1,
@@ -111,6 +143,9 @@ export class AccountingDatabase {
         ON expenses(secondary_category_id, spent_date DESC);
     `)
     const categoryColumns = this.db.pragma('table_info(categories)') as Array<{ name: string }>
+    if (!categoryColumns.some((column) => column.name === 'color')) {
+      this.db.exec("ALTER TABLE categories ADD COLUMN color TEXT NOT NULL DEFAULT '#7c8580'")
+    }
     if (!categoryColumns.some((column) => column.name === 'entry_type')) {
       this.db.exec("ALTER TABLE categories ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'expense' CHECK(entry_type IN ('expense', 'income'))")
     }
@@ -128,16 +163,20 @@ export class AccountingDatabase {
     this.db.prepare(`
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?)
     `).run(new Date().toISOString())
+    this.db.prepare(`
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(3, ?)
+    `).run(new Date().toISOString())
   }
 
   private seedCategories(): void {
     const statement = this.db.prepare(`
-      INSERT INTO categories(id, parent_id, name, icon, sort_order, entry_type, is_system, is_active)
-      VALUES(@id, @parentId, @name, @icon, @sortOrder, @entryType, 1, 1)
+      INSERT INTO categories(id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active)
+      VALUES(@id, @parentId, @name, @icon, @color, @sortOrder, @entryType, 1, 1)
       ON CONFLICT(id) DO UPDATE SET
         parent_id = excluded.parent_id,
         name = excluded.name,
         icon = excluded.icon,
+        color = excluded.color,
         sort_order = excluded.sort_order,
         entry_type = excluded.entry_type,
         is_active = 1
@@ -156,20 +195,213 @@ export class AccountingDatabase {
     if (this.db.open) this.db.close()
   }
 
-  getCategories(): Category[] {
-    return this.db.prepare(`
-      SELECT id, parent_id AS parentId, name, icon, sort_order AS sortOrder, entry_type AS entryType
-      FROM categories WHERE is_active = 1
-      ORDER BY CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END, parent_id, sort_order
-    `).all() as Category[]
+  private mapCategory(row: CategoryRow): Category {
+    return {
+      id: row.id,
+      parentId: row.parent_id,
+      name: row.name,
+      icon: row.icon,
+      color: row.color,
+      sortOrder: row.sort_order,
+      entryType: row.entry_type,
+      isSystem: row.is_system === 1,
+      isActive: row.is_active === 1
+    }
   }
 
-  private validateCategoryPair(primaryId: string, secondaryId: string, entryType: EntryType): void {
+  private categoryRow(id: string): CategoryRow {
+    const row = this.db.prepare(`
+      SELECT id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active
+      FROM categories WHERE id = ?
+    `).get(id) as CategoryRow | undefined
+    if (!row) throw new Error('没有找到该分类')
+    return row
+  }
+
+  private assertCustomCategory(row: CategoryRow): void {
+    if (row.is_system === 1 || !row.id.startsWith('custom.')) throw new Error('系统预设分类不能修改')
+  }
+
+  private ensureUniqueCategoryName(parentId: string | null, entryType: EntryType, name: string, excludeId?: string): void {
+    const row = this.db.prepare(`
+      SELECT id FROM categories
+      WHERE ((parent_id IS NULL AND @parentId IS NULL) OR parent_id = @parentId)
+        AND entry_type = @entryType AND name = @name AND id <> COALESCE(@excludeId, '')
+      LIMIT 1
+    `).get({ parentId, entryType, name, excludeId: excludeId ?? null }) as { id: string } | undefined
+    if (row) throw new Error('同一级别已经存在同名分类')
+  }
+
+  private nextCategorySortOrder(parentId: string | null, entryType: EntryType): number {
+    const row = this.db.prepare(`
+      SELECT COALESCE(MAX(sort_order), -1) + 1 AS nextOrder FROM categories
+      WHERE ((parent_id IS NULL AND @parentId IS NULL) OR parent_id = @parentId)
+        AND entry_type = @entryType
+    `).get({ parentId, entryType }) as { nextOrder: number }
+    return row.nextOrder
+  }
+
+  getCategories(): Category[] {
+    const rows = this.db.prepare(`
+      SELECT id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active
+      FROM categories WHERE is_active = 1
+      ORDER BY entry_type, CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END, parent_id, sort_order, name
+    `).all() as CategoryRow[]
+    return rows.map((row) => this.mapCategory(row))
+  }
+
+  getCategoriesForManagement(): CategoryManagementItem[] {
+    const rows = this.db.prepare(`
+      SELECT c.id, c.parent_id, c.name, c.icon, c.color, c.sort_order, c.entry_type,
+             c.is_system, c.is_active,
+             CASE WHEN c.parent_id IS NULL
+               THEN (SELECT COUNT(*) FROM expenses e WHERE e.primary_category_id = c.id)
+               ELSE (SELECT COUNT(*) FROM expenses e WHERE e.secondary_category_id = c.id)
+             END AS usage_count
+      FROM categories c
+      ORDER BY c.entry_type, CASE WHEN c.parent_id IS NULL THEN 0 ELSE 1 END,
+               c.parent_id, c.sort_order, c.name
+    `).all() as CategoryRow[]
+    return rows.map((row) => ({ ...this.mapCategory(row), usageCount: row.usage_count ?? 0 }))
+  }
+
+  createCustomPrimaryCategory(rawInput: CustomPrimaryCategoryInput): Category {
+    const input = customPrimaryCategoryInputSchema.parse(rawInput)
+    this.ensureUniqueCategoryName(null, input.entryType, input.name)
+    const primaryId = `custom.${randomUUID()}`
+    const secondaryId = `custom.${randomUUID()}`
+    const create = this.db.prepare(`
+      INSERT INTO categories(id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active)
+      VALUES(@id, @parentId, @name, @icon, @color, @sortOrder, @entryType, 0, 1)
+    `)
+    this.db.transaction(() => {
+      create.run({
+        id: primaryId,
+        parentId: null,
+        name: input.name,
+        icon: input.icon,
+        color: input.color,
+        sortOrder: this.nextCategorySortOrder(null, input.entryType),
+        entryType: input.entryType
+      })
+      this.ensureUniqueCategoryName(primaryId, input.entryType, input.firstSecondaryName)
+      create.run({
+        id: secondaryId,
+        parentId: primaryId,
+        name: input.firstSecondaryName,
+        icon: input.icon,
+        color: input.color,
+        sortOrder: 0,
+        entryType: input.entryType
+      })
+    })()
+    return this.mapCategory(this.categoryRow(primaryId))
+  }
+
+  createCustomSecondaryCategory(rawInput: CustomSecondaryCategoryInput): Category {
+    const input = customSecondaryCategoryInputSchema.parse(rawInput)
+    const parent = this.categoryRow(input.parentId)
+    if (parent.parent_id !== null) throw new Error('二级分类只能添加到一级分类下')
+    if (parent.is_active !== 1) throw new Error('请先启用所属一级分类')
+    this.ensureUniqueCategoryName(parent.id, parent.entry_type, input.name)
+    const id = `custom.${randomUUID()}`
+    this.db.prepare(`
+      INSERT INTO categories(id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active)
+      VALUES(@id, @parentId, @name, @icon, @color, @sortOrder, @entryType, 0, 1)
+    `).run({
+      id,
+      parentId: parent.id,
+      name: input.name,
+      icon: parent.icon,
+      color: parent.color,
+      sortOrder: this.nextCategorySortOrder(parent.id, parent.entry_type),
+      entryType: parent.entry_type
+    })
+    return this.mapCategory(this.categoryRow(id))
+  }
+
+  updateCustomCategory(id: string, rawInput: CustomCategoryUpdate): Category {
+    const input = customCategoryUpdateSchema.parse(rawInput)
+    const category = this.categoryRow(id)
+    this.assertCustomCategory(category)
+    this.ensureUniqueCategoryName(category.parent_id, category.entry_type, input.name, id)
+    const icon = category.parent_id === null ? (input.icon ?? category.icon) : category.icon
+    const color = category.parent_id === null ? (input.color ?? category.color) : category.color
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ?')
+        .run(input.name, icon, color, id)
+      if (category.parent_id === null) {
+        this.db.prepare('UPDATE categories SET icon = ?, color = ? WHERE parent_id = ? AND is_system = 0')
+          .run(icon, color, id)
+      }
+    })()
+    return this.mapCategory(this.categoryRow(id))
+  }
+
+  setCustomCategoryActive(id: string, active: boolean): Category[] {
+    const category = this.categoryRow(id)
+    this.assertCustomCategory(category)
+    if (active && category.parent_id !== null) {
+      const parent = this.categoryRow(category.parent_id)
+      if (parent.is_active !== 1) throw new Error('请先启用所属一级分类')
+    }
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE categories SET is_active = ? WHERE id = ?').run(active ? 1 : 0, id)
+      if (category.parent_id === null) {
+        this.db.prepare('UPDATE categories SET is_active = ? WHERE parent_id = ? AND is_system = 0')
+          .run(active ? 1 : 0, id)
+      }
+    })()
+    return this.getCategories()
+  }
+
+  deleteCustomCategory(id: string): CategoryDeleteResult {
+    const category = this.categoryRow(id)
+    this.assertCustomCategory(category)
+    const usage = category.parent_id === null
+      ? this.db.prepare('SELECT COUNT(*) AS count FROM expenses WHERE primary_category_id = ?').get(id) as { count: number }
+      : this.db.prepare('SELECT COUNT(*) AS count FROM expenses WHERE secondary_category_id = ?').get(id) as { count: number }
+    if (usage.count > 0) {
+      this.setCustomCategoryActive(id, false)
+      return { mode: 'deactivated' }
+    }
+    this.db.transaction(() => {
+      if (category.parent_id === null) {
+        this.db.prepare('DELETE FROM categories WHERE parent_id = ? AND is_system = 0').run(id)
+      }
+      this.db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+    })()
+    return { mode: 'deleted' }
+  }
+
+  reorderCustomCategory(id: string, direction: 'up' | 'down'): Category[] {
+    const category = this.categoryRow(id)
+    this.assertCustomCategory(category)
+    const siblings = this.db.prepare(`
+      SELECT id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active
+      FROM categories
+      WHERE is_system = 0 AND entry_type = @entryType
+        AND ((parent_id IS NULL AND @parentId IS NULL) OR parent_id = @parentId)
+      ORDER BY sort_order, name
+    `).all({ parentId: category.parent_id, entryType: category.entry_type }) as CategoryRow[]
+    const index = siblings.findIndex((sibling) => sibling.id === id)
+    const swapIndex = direction === 'up' ? index - 1 : index + 1
+    if (index < 0 || swapIndex < 0 || swapIndex >= siblings.length) return this.getCategories()
+    const other = siblings[swapIndex]!
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE categories SET sort_order = ? WHERE id = ?').run(other.sort_order, category.id)
+      this.db.prepare('UPDATE categories SET sort_order = ? WHERE id = ?').run(category.sort_order, other.id)
+    })()
+    return this.getCategories()
+  }
+
+  private validateCategoryPair(primaryId: string, secondaryId: string, entryType: EntryType, requireActive = true): void {
+    const activeCondition = requireActive ? 'AND p.is_active = 1 AND s.is_active = 1' : ''
     const result = this.db.prepare(`
       SELECT COUNT(*) AS count FROM categories p
       JOIN categories s ON s.parent_id = p.id
       WHERE p.id = ? AND s.id = ? AND p.entry_type = ? AND s.entry_type = ?
-        AND p.is_active = 1 AND s.is_active = 1
+        ${activeCondition}
     `).get(primaryId, secondaryId, entryType, entryType) as { count: number }
     if (result.count !== 1) throw new Error('所选分类与收支类型不匹配')
   }
@@ -226,7 +458,9 @@ export class AccountingDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       primaryCategoryName: row.primary_category_name,
-      secondaryCategoryName: row.secondary_category_name
+      secondaryCategoryName: row.secondary_category_name,
+      primaryCategoryIcon: row.primary_category_icon,
+      primaryCategoryColor: row.primary_category_color
     }
   }
 
@@ -260,7 +494,7 @@ export class AccountingDatabase {
   private categoryTotals(startDate: string, endDate: string, entryType: EntryType): CategoryTotal[] {
     const rows = this.db.prepare(`
       SELECT e.primary_category_id AS category_id, c.name AS category_name,
-             SUM(e.amount_cents) AS amount_cents
+             SUM(e.amount_cents) AS amount_cents, c.color, c.icon
       FROM expenses e JOIN categories c ON c.id = e.primary_category_id
       WHERE e.spent_date BETWEEN ? AND ? AND e.entry_type = ?
       GROUP BY e.primary_category_id, c.name
@@ -270,7 +504,8 @@ export class AccountingDatabase {
       categoryId: row.category_id,
       categoryName: row.category_name,
       amountCents: row.amount_cents,
-      color: getCategoryColor(row.category_id)
+      color: row.color,
+      icon: row.icon
     }))
   }
 
@@ -327,6 +562,7 @@ export class AccountingDatabase {
       JOIN categories p ON p.id = e.primary_category_id
       JOIN categories s ON s.id = e.secondary_category_id
       WHERE e.spent_date BETWEEN ? AND ? AND e.entry_type = ?
+        AND p.is_active = 1 AND s.is_active = 1
       GROUP BY e.primary_category_id, e.secondary_category_id, p.name, s.name
       ORDER BY count DESC, MAX(e.spent_date || ' ' || e.spent_time) DESC
       LIMIT 4
@@ -334,8 +570,13 @@ export class AccountingDatabase {
   }
 
   getSettings(): AppSettings {
-    const row = this.db.prepare("SELECT value FROM app_settings WHERE key = 'theme'").get() as { value: ThemeMode } | undefined
-    return { theme: row?.value ?? 'system' }
+    const rows = this.db.prepare("SELECT key, value FROM app_settings WHERE key IN ('theme', 'color_theme')")
+      .all() as Array<{ key: string; value: string }>
+    const values = new Map(rows.map((row) => [row.key, row.value]))
+    return {
+      theme: (values.get('theme') as ThemeMode | undefined) ?? 'system',
+      colorTheme: (values.get('color_theme') as ColorTheme | undefined) ?? 'forest'
+    }
   }
 
   setTheme(theme: ThemeMode): AppSettings {
@@ -343,7 +584,15 @@ export class AccountingDatabase {
       INSERT INTO app_settings(key, value) VALUES('theme', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run(theme)
-    return { theme }
+    return this.getSettings()
+  }
+
+  setColorTheme(colorTheme: ColorTheme): AppSettings {
+    this.db.prepare(`
+      INSERT INTO app_settings(key, value) VALUES('color_theme', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(colorTheme)
+    return this.getSettings()
   }
 
   getBackupPayload(): BackupPayload {
@@ -351,7 +600,18 @@ export class AccountingDatabase {
       SELECT id, entry_type, amount_cents, primary_category_id, secondary_category_id,
              spent_date, spent_time, note, created_at, updated_at
       FROM expenses ORDER BY spent_date, spent_time, created_at
-    `).all() as Array<Omit<ExpenseRow, 'primary_category_name' | 'secondary_category_name'>>
+    `).all() as Array<{
+      id: string
+      entry_type: EntryType
+      amount_cents: number
+      primary_category_id: string
+      secondary_category_id: string
+      spent_date: string
+      spent_time: string
+      note: string
+      created_at: string
+      updated_at: string
+    }>
     const expenses: BackupExpense[] = rows.map((row) => ({
       id: row.id,
       entryType: row.entry_type,
@@ -364,28 +624,70 @@ export class AccountingDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at
     }))
-    return { expenses, settings: this.getSettings() }
+    const categoryRows = this.db.prepare(`
+      SELECT id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active
+      FROM categories WHERE is_system = 0
+      ORDER BY CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END, parent_id, sort_order, name
+    `).all() as CategoryRow[]
+    const categories: BackupCategory[] = categoryRows.map((row) => ({
+      id: row.id,
+      parentId: row.parent_id,
+      name: row.name,
+      icon: row.icon,
+      color: row.color,
+      sortOrder: row.sort_order,
+      entryType: row.entry_type,
+      isActive: row.is_active === 1
+    }))
+    return { categories, expenses, settings: this.getSettings() }
   }
 
-  replaceFromBackup(payload: BackupPayload): void {
-    for (const expense of payload.expenses) {
-      expenseInputSchema.parse(expense)
-      this.validateCategoryPair(expense.primaryCategoryId, expense.secondaryCategoryId, expense.entryType)
-    }
-    const ids = new Set(payload.expenses.map((expense) => expense.id))
-    if (ids.size !== payload.expenses.length) throw new Error('备份中存在重复账目编号')
+  replaceFromBackup(rawPayload: BackupPayload): void {
+    const payload = backupPayloadSchema.parse(rawPayload)
+    const expenseIds = new Set(payload.expenses.map((expense) => expense.id))
+    if (expenseIds.size !== payload.expenses.length) throw new Error('备份中存在重复账目编号')
+    const categoryIds = new Set(payload.categories.map((category) => category.id))
+    if (categoryIds.size !== payload.categories.length) throw new Error('备份中存在重复分类编号')
 
-    const insert = this.db.prepare(`
+    const insertExpense = this.db.prepare(`
       INSERT INTO expenses(
         id, entry_type, amount_cents, primary_category_id, secondary_category_id,
         spent_date, spent_time, note, created_at, updated_at
       ) VALUES(@id, @entryType, @amountCents, @primaryCategoryId, @secondaryCategoryId,
         @spentDate, @spentTime, @note, @createdAt, @updatedAt)
     `)
+    const insertCategory = this.db.prepare(`
+      INSERT INTO categories(id, parent_id, name, icon, color, sort_order, entry_type, is_system, is_active)
+      VALUES(@id, @parentId, @name, @icon, @color, @sortOrder, @entryType, 0, @isActive)
+    `)
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM expenses').run()
-      for (const expense of payload.expenses) insert.run(expense)
+      this.db.prepare('DELETE FROM categories WHERE is_system = 0').run()
+
+      const orderedCategories = [...payload.categories].sort((left, right) =>
+        Number(left.parentId !== null) - Number(right.parentId !== null) || left.sortOrder - right.sortOrder)
+      for (const category of orderedCategories) {
+        const systemCollision = this.db.prepare('SELECT 1 FROM categories WHERE id = ? AND is_system = 1')
+          .get(category.id)
+        if (systemCollision) throw new Error('备份中的自定义分类与系统分类冲突')
+        if (category.parentId !== null) {
+          const parent = this.categoryRow(category.parentId)
+          if (parent.parent_id !== null || parent.entry_type !== category.entryType) {
+            throw new Error('备份中的分类层级或收支类型不正确')
+          }
+          if (category.isActive && parent.is_active !== 1) throw new Error('备份中启用的二级分类所属一级分类已停用')
+        }
+        this.ensureUniqueCategoryName(category.parentId, category.entryType, category.name)
+        insertCategory.run({ ...category, isActive: category.isActive ? 1 : 0 })
+      }
+
+      for (const expense of payload.expenses) {
+        expenseInputSchema.parse(expense)
+        this.validateCategoryPair(expense.primaryCategoryId, expense.secondaryCategoryId, expense.entryType, false)
+        insertExpense.run(expense)
+      }
       this.setTheme(payload.settings.theme)
+      this.setColorTheme(payload.settings.colorTheme)
     })()
   }
 }
