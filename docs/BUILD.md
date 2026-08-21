@@ -10,7 +10,7 @@
 
 项目路径可以包含中文和空格，当前项目已经在该路径完成类型检查、测试、Electron 启动和构建。
 
-当前源码版本为1.2.0预览版。用户决定先体验功能再制作安装包，因此本轮没有生成1.2.0 Windows安装版或便携版，`release` 中仍是已验证的1.1.0产物。
+当前源码版本为1.3.0预览版。用户决定先体验功能再制作安装包，因此本轮没有生成1.3.0 Windows安装版或便携版，`release` 中仍是已验证的1.1.0产物。
 
 ## 安装依赖
 
@@ -55,7 +55,7 @@ npm run dist:win
 - `HeimaAccounting-Portable-1.1.0-x64.exe`：无需安装的便携版。
 - `win-unpacked\HeimaAccounting.exe`：解压运行目录中的主程序。
 
-在用户确认1.2.0预览版之前不要把上述文件误称为1.2.0。确认后再执行 `npm run dist:win`，预期生成带1.2.0版本号的新文件。
+在用户确认1.3.0预览版之前不要把上述文件误称为1.3.0。确认后再执行 `npm run dist:win`，预期生成带1.3.0版本号的新文件。
 
 当前产物没有代码签名证书，Windows SmartScreen 可能显示“未知发布者”。这是签名限制，不是程序损坏。
 
@@ -81,3 +81,5 @@ SVG 源文件在 `assets/logo.svg`。Windows 上可重新生成512像素安装�
 ```powershell
 npm run icons
 ```
+
+界面中的立体分类图标位于 `src/renderer/public/category-3d-atlas.png`。这是运行时资源，必须保留并由Git管理；它不是构建缓存，不应在清理项目时删除。

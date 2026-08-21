@@ -1,5 +1,5 @@
-import { createContext, useContext, useState } from 'react'
-import { BarChart3, Database, Home, Plus, ReceiptText, Tags } from 'lucide-react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { BarChart3, CalendarClock, Database, Home, Plus, ReceiptText, Tags } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { Expense } from '../../../shared/types'
 import { ExpenseFormDialog } from './ExpenseFormDialog'
@@ -17,12 +17,15 @@ const pages: Record<string, { title: string; subtitle: string }> = {
   '/records': { title: '账单', subtitle: '收入与支出，每一笔都清清楚楚。' },
   '/statistics': { title: '统计', subtitle: '看见资金的来处与去向，做更从容的选择。' },
   '/categories': { title: '分类管理', subtitle: '保留可靠的系统分类，也建立属于你的分类。' },
+  '/planning': { title: '预算与计划', subtitle: '给固定收支一个安排，也为消费留出边界。' },
   '/settings': { title: '数据与设置', subtitle: '管理外观、导出与本地备份。' }
 }
 
 export function AppShell(): React.JSX.Element {
   const [dialogExpense, setDialogExpense] = useState<Expense | null | undefined>(undefined)
   const location = useLocation()
+  const mainAreaRef = useRef<HTMLElement>(null)
+  useEffect(() => { mainAreaRef.current?.scrollTo({ top: 0 }) }, [location.pathname])
   const page = pages[location.pathname] ?? pages['/']!
   const context = {
     openNewExpense: () => setDialogExpense(null),
@@ -41,6 +44,7 @@ export function AppShell(): React.JSX.Element {
             <NavLink to="/records"><ReceiptText size={19} /><span>账单</span></NavLink>
             <NavLink to="/statistics"><BarChart3 size={19} /><span>统计</span></NavLink>
             <NavLink to="/categories"><Tags size={19} /><span>分类管理</span></NavLink>
+            <NavLink to="/planning"><CalendarClock size={19} /><span>预算与计划</span></NavLink>
             <NavLink to="/settings"><Database size={19} /><span>数据与设置</span></NavLink>
           </nav>
           <div className="sidebar-note">
@@ -48,7 +52,7 @@ export function AppShell(): React.JSX.Element {
             <div><strong>本地安全保存</strong><span>无需联网 · 无需账号</span></div>
           </div>
         </aside>
-        <main className="main-area">
+        <main className="main-area" ref={mainAreaRef}>
           <header className="topbar">
             <div><h1>{page.title}</h1><p>{page.subtitle}</p></div>
             <button className="button primary add-button" onClick={context.openNewExpense}><Plus size={18} />记一笔</button>

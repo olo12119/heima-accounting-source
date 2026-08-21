@@ -8,6 +8,8 @@ import { RecordsPage } from './pages/RecordsPage'
 import { StatisticsPage } from './pages/StatisticsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { CategoriesPage } from './pages/CategoriesPage'
+import { LockScreen } from './components/LockScreen'
+import { PlanningPage } from './pages/PlanningPage'
 import type { ColorTheme, ThemeMode } from '../../shared/types'
 
 const applyTheme = (mode: ThemeMode, colorTheme: ColorTheme): (() => void) => {
@@ -23,10 +25,14 @@ const applyTheme = (mode: ThemeMode, colorTheme: ColorTheme): (() => void) => {
 
 export default function App(): React.JSX.Element {
   const statusQuery = useQuery({ queryKey: ['status'], queryFn: () => window.heima.getStatus(), staleTime: Infinity })
+  const lockQuery = useQuery({
+    queryKey: ['lock-status'], queryFn: () => window.heima.getLockStatus(),
+    enabled: statusQuery.data?.ready === true, staleTime: Infinity
+  })
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: () => window.heima.getSettings(),
-    enabled: statusQuery.data?.ready === true
+    enabled: statusQuery.data?.ready === true && lockQuery.data?.locked === false
   })
   useEffect(() => applyTheme(
     settingsQuery.data?.theme ?? 'system',
@@ -49,6 +55,8 @@ export default function App(): React.JSX.Element {
       </main>
     )
   }
+  if (lockQuery.isLoading) return <div className="splash"><img src="./logo.svg" alt="" /><strong>黑马记账</strong><span>正在检查隐私保护…</span></div>
+  if (lockQuery.data?.locked) return <LockScreen onUnlocked={async () => { await lockQuery.refetch(); await settingsQuery.refetch() }} />
 
   return (
     <Routes>
@@ -57,6 +65,7 @@ export default function App(): React.JSX.Element {
         <Route path="records" element={<RecordsPage />} />
         <Route path="statistics" element={<StatisticsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="planning" element={<PlanningPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enumerateDates, formatLocalDate, getPresetRange } from '../../src/shared/dates'
+import { advanceRecurrenceDate, enumerateDates, formatLocalDate, getPresetRange } from '../../src/shared/dates'
 import { formatCents, parseYuanToCents } from '../../src/shared/money'
 
 describe('金额处理', () => {
@@ -35,5 +35,11 @@ describe('日期范围', () => {
       '2026-07-30', '2026-07-31', '2026-08-01', '2026-08-02'
     ])
     expect(formatLocalDate(now)).toBe('2026-08-20')
+  })
+
+  it('周期日期跨过短月份时停在当月最后一天', () => {
+    expect(advanceRecurrenceDate('2026-01-31', 'monthly')).toBe('2026-02-28')
+    expect(advanceRecurrenceDate('2024-02-29', 'yearly')).toBe('2025-02-28')
+    expect(advanceRecurrenceDate('2026-12-31', 'monthly')).toBe('2027-01-31')
   })
 })

@@ -59,7 +59,21 @@ const icons: Record<string, Icon> = {
   wallet: Wallet
 }
 
-export function CategoryIcon({ name, ...props }: { name: string } & Omit<IconProps, 'weight'>): React.JSX.Element {
+const spriteOrder = [
+  'utensils', 'car', 'shopping-bag', 'house', 'clapperboard', 'heart-pulse', 'book-open',
+  'wifi', 'gift', 'luggage', 'shapes', 'briefcase-business', 'badge-dollar-sign', 'store',
+  'chart-no-axes-combined', 'receipt-text', 'hand-coins', 'circle-dollar-sign', 'coffee', 'bus', 't-shirt',
+  'paw-print', 'baby', 'airplane', 'game-controller', 'graduation-cap', 'first-aid', 'wallet'
+] as const
+
+export function CategoryIcon({ name, size = 24, className, ...props }: { name: string } & Omit<IconProps, 'weight'>): React.JSX.Element {
   const IconComponent = icons[name] ?? Shapes
-  return <IconComponent aria-hidden="true" weight="duotone" {...props} />
+  const index = Math.max(0, spriteOrder.indexOf(name as typeof spriteOrder[number]))
+  const numericSize = typeof size === 'number' ? size : Number.parseFloat(String(size)) || 24
+  const column = index % 7
+  const row = Math.floor(index / 7)
+  return <span className={`category-3d-icon ${className ?? ''}`} style={{ width: numericSize, height: numericSize }} aria-hidden="true">
+    <IconComponent className="category-vector-fallback" size={numericSize} weight="duotone" {...props} />
+    <img src="./category-3d-atlas.png" alt="" draggable={false} onError={(event) => { event.currentTarget.hidden = true }} style={{ width: numericSize * 7, height: numericSize * 4, left: -column * numericSize, top: -row * numericSize }} />
+  </span>
 }

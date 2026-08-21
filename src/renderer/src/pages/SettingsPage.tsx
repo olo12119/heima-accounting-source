@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, DatabaseBackup, Download, FileSpreadsheet, HardDrive, Laptop, Moon, RotateCcw, Sun } from 'lucide-react'
+import { Check, DatabaseBackup, Download, FileSpreadsheet, HardDrive, Laptop, LockKeyhole, Moon, RotateCcw, Sun, Upload } from 'lucide-react'
 import type { ColorTheme, ThemeMode } from '../../../shared/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { getErrorMessage } from '../lib/errors'
@@ -12,18 +12,21 @@ const themes: Array<{ value: ThemeMode; label: string; description: string; icon
 ]
 
 const colorThemes: Array<{ value: ColorTheme; label: string; description: string; colors: [string, string, string] }> = [
-  { value: 'forest', label: '黑马墨绿', description: '沉稳、清晰的品牌配色', colors: ['#19664f', '#d6ab69', '#cf684e'] },
-  { value: 'ocean', label: '雾蓝海岸', description: '安静清爽的蓝灰气息', colors: ['#316f8f', '#69a9b7', '#d47a67'] },
-  { value: 'amber', label: '暖杏琥珀', description: '温暖柔和的生活感', colors: ['#9b633d', '#d89a55', '#c96358'] },
-  { value: 'wisteria', label: '紫藤暮色', description: '克制精致的灰紫色', colors: ['#6d5b91', '#a887b7', '#d17378'] }
+  { value: 'forest', label: '黑曜鎏金', description: '深墨翡翠与克制金光', colors: ['#19664f', '#d6ab69', '#cf684e'] },
+  { value: 'ocean', label: '极光深海', description: '冷静海蓝与通透青光', colors: ['#316f8f', '#69a9b7', '#d47a67'] },
+  { value: 'amber', label: '琥珀日落', description: '温暖杏棕与珊瑚余晖', colors: ['#9b633d', '#d89a55', '#c96358'] },
+  { value: 'wisteria', label: '紫晶暮色', description: '紫晶层次与夜间氛围', colors: ['#6d5b91', '#a887b7', '#d17378'] }
 ]
 
 export function SettingsPage(): React.JSX.Element {
   const [confirmRestore, setConfirmRestore] = useState(false)
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
   const queryClient = useQueryClient()
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: () => window.heima.getSettings() })
   const statusQuery = useQuery({ queryKey: ['status'], queryFn: () => window.heima.getStatus(), staleTime: Infinity })
+  const lockQuery = useQuery({ queryKey: ['lock-status'], queryFn: () => window.heima.getLockStatus() })
   const themeMutation = useMutation({
     mutationFn: (theme: ThemeMode) => window.heima.setTheme(theme),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['settings'] })
@@ -33,22 +36,31 @@ export function SettingsPage(): React.JSX.Element {
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['settings'] })
   })
   const operation = useMutation({
-    mutationFn: async (type: 'csv' | 'backup' | 'restore') => {
+    mutationFn: async (type: 'csv' | 'backup' | 'restore' | 'import') => {
       if (type === 'csv') return window.heima.exportCsv()
       if (type === 'backup') return window.heima.exportBackup()
+      if (type === 'import') return window.heima.importCsv()
       return window.heima.restoreBackup()
     },
     onSuccess: async (result, type) => {
       setConfirmRestore(false)
       if (result.canceled) return
-      const labels = { csv: 'CSV 已导出', backup: '完整备份已保存', restore: `已恢复 ${result.count ?? 0} 笔账目` }
+      const labels = { csv: 'CSV 已导出', backup: '完整备份已保存', restore: `已恢复 ${result.count ?? 0} 笔账目`, import: `已导入 ${'importedCount' in result ? result.importedCount ?? 0 : 0} 笔账目` }
       setMessage({ kind: 'success', text: `${labels[type]}${result.path ? `：${result.path}` : ''}` })
-      if (type === 'restore') await queryClient.invalidateQueries()
+      if (type === 'restore' || type === 'import') await queryClient.invalidateQueries()
     },
     onError: (error) => {
       setConfirmRestore(false)
       setMessage({ kind: 'error', text: getErrorMessage(error) })
     }
+  })
+  const lockMutation = useMutation({
+    mutationFn: () => window.heima.setLockPin(lockQuery.data?.enabled ? currentPin : null, lockQuery.data?.enabled ? null : newPin),
+    onSuccess: async () => {
+      setCurrentPin(''); setNewPin(''); setMessage({ kind: 'success', text: lockQuery.data?.enabled ? '隐私密码已关闭' : '隐私密码已开启' })
+      await queryClient.invalidateQueries({ queryKey: ['lock-status'] })
+    },
+    onError: (error) => setMessage({ kind: 'error', text: getErrorMessage(error) })
   })
 
   return (
@@ -80,11 +92,21 @@ export function SettingsPage(): React.JSX.Element {
       <section className="panel settings-section data-section">
         <div className="settings-heading"><div className="settings-icon"><DatabaseBackup size={20} /></div><div><h2>导出与备份</h2><p>把账目带走，或为全部数据留一份副本。</p></div></div>
         <div className="data-actions">
+          <div><span className="action-icon"><Upload size={20} /></span><span><strong>导入 CSV 账单</strong><small>导入前预览数量、跳过重复并自动备份</small></span><button className="button secondary" disabled={operation.isPending} onClick={() => operation.mutate('import')}><Upload size={16} />导入</button></div>
           <div><span className="action-icon"><FileSpreadsheet size={20} /></span><span><strong>导出 CSV 表格</strong><small>导出全部账目，可使用 Excel 打开</small></span><button className="button secondary" disabled={operation.isPending} onClick={() => operation.mutate('csv')}><Download size={16} />导出</button></div>
           <div><span className="action-icon"><HardDrive size={20} /></span><span><strong>导出完整备份</strong><small>包含全部账目与设置，可供以后恢复</small></span><button className="button secondary" disabled={operation.isPending} onClick={() => operation.mutate('backup')}><Download size={16} />备份</button></div>
           <div><span className="action-icon warm"><RotateCcw size={20} /></span><span><strong>从备份恢复</strong><small>恢复前会自动保存当前数据</small></span><button className="button ghost" disabled={operation.isPending} onClick={() => setConfirmRestore(true)}><RotateCcw size={16} />恢复</button></div>
         </div>
         {message && <div className={`operation-message ${message.kind}`} role="status">{message.text}</div>}
+      </section>
+
+      <section className="panel settings-section privacy-section">
+        <div className="settings-heading"><div className="settings-icon"><LockKeyhole size={20} /></div><div><h2>隐私密码</h2><p>防止身边的人随手打开查看账目。</p></div></div>
+        <div className="pin-setting">
+          <div><strong>{lockQuery.data?.enabled ? '保护已开启' : '保护未开启'}</strong><small>密码仅在本机校验；它不是数据库文件加密。</small></div>
+          <input aria-label={lockQuery.data?.enabled ? '当前隐私密码' : '新隐私密码'} type="password" inputMode="numeric" maxLength={12} value={lockQuery.data?.enabled ? currentPin : newPin} onChange={(event) => lockQuery.data?.enabled ? setCurrentPin(event.target.value.replace(/\D/g, '')) : setNewPin(event.target.value.replace(/\D/g, ''))} placeholder={lockQuery.data?.enabled ? '输入当前密码以关闭' : '设置4至12位数字'} />
+          <button className={`button ${lockQuery.data?.enabled ? 'ghost' : 'primary'}`} disabled={lockMutation.isPending || (lockQuery.data?.enabled ? currentPin.length < 4 : newPin.length < 4)} onClick={() => lockMutation.mutate()}>{lockQuery.data?.enabled ? '关闭密码' : '开启密码'}</button>
+        </div>
       </section>
 
       <section className="panel settings-section storage-section">

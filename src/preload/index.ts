@@ -3,6 +3,9 @@ import type { HeimaApi } from '../shared/types'
 
 const api: HeimaApi = {
   getStatus: () => ipcRenderer.invoke('system:get-status'),
+  getLockStatus: () => ipcRenderer.invoke('system:get-lock-status'),
+  unlock: (pin) => ipcRenderer.invoke('system:unlock', pin),
+  setLockPin: (currentPin, newPin) => ipcRenderer.invoke('system:set-lock-pin', currentPin, newPin),
   getCategories: () => ipcRenderer.invoke('categories:list'),
   getCategoriesForManagement: () => ipcRenderer.invoke('categories:manage-list'),
   getFrequentCategories: (entryType) => ipcRenderer.invoke('categories:frequent', entryType),
@@ -13,17 +16,27 @@ const api: HeimaApi = {
   deleteCustomCategory: (id) => ipcRenderer.invoke('categories:delete', id),
   reorderCustomCategory: (id, direction) => ipcRenderer.invoke('categories:reorder', id, direction),
   listExpenses: (preset, entryType = 'all') => ipcRenderer.invoke('expenses:list', preset, entryType),
+  searchExpenses: (query) => ipcRenderer.invoke('expenses:search', query),
   createExpense: (input) => ipcRenderer.invoke('expenses:create', input),
   updateExpense: (id, input) => ipcRenderer.invoke('expenses:update', id, input),
   deleteExpense: (id) => ipcRenderer.invoke('expenses:delete', id),
   getDashboard: () => ipcRenderer.invoke('dashboard:get'),
   getStatistics: (preset, entryType) => ipcRenderer.invoke('statistics:get', preset, entryType),
+  queryStatistics: (query) => ipcRenderer.invoke('statistics:query', query),
+  getCalendarMonth: (month) => ipcRenderer.invoke('calendar:get-month', month),
+  getBudget: (month) => ipcRenderer.invoke('budgets:get', month),
+  saveBudget: (input) => ipcRenderer.invoke('budgets:save', input),
+  listTemplates: () => ipcRenderer.invoke('templates:list'),
+  saveTemplate: (input) => ipcRenderer.invoke('templates:save', input),
+  deleteTemplate: (id) => ipcRenderer.invoke('templates:delete', id),
+  applyTemplate: (id, spentDate) => ipcRenderer.invoke('templates:apply', id, spentDate),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setTheme: (theme) => ipcRenderer.invoke('settings:set-theme', theme),
   setColorTheme: (colorTheme) => ipcRenderer.invoke('settings:set-color-theme', colorTheme),
   exportCsv: () => ipcRenderer.invoke('data:export-csv'),
   exportBackup: () => ipcRenderer.invoke('data:export-backup'),
-  restoreBackup: () => ipcRenderer.invoke('data:restore-backup')
+  restoreBackup: () => ipcRenderer.invoke('data:restore-backup'),
+  importCsv: () => ipcRenderer.invoke('data:import-csv')
 }
 
 contextBridge.exposeInMainWorld('heima', api)

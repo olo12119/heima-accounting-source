@@ -147,6 +147,65 @@ describe('SQLite 账本', () => {
     database.close()
   })
 
+  it('支持关键词、金额、自定义日期和年度搜索', () => {
+    const { database } = createDatabase()
+    database.createExpense(todayInput({ amountCents: 1888, note: '周末火锅' }))
+    database.createExpense(todayInput({ amountCents: 600, primaryCategoryId: 'transport', secondaryCategoryId: 'transport.public', note: '地铁' }))
+    expect(database.searchExpenses({ preset: 'all', entryType: 'all', keyword: '火锅' })).toHaveLength(1)
+    expect(database.searchExpenses({ preset: 'all', entryType: 'all', keyword: '18.88' })).toHaveLength(1)
+    const today = formatLocalDate(new Date())
+    expect(database.searchExpenses({ preset: 'custom', entryType: 'expense', keyword: '', startDate: today, endDate: today })).toHaveLength(2)
+    expect(database.listExpenses('year')).toHaveLength(2)
+    database.close()
+  })
+
+  it('退款冲减支出、报销不虚增收入，并尊重不计入统计', () => {
+    const { database } = createDatabase()
+    const original = database.createExpense(todayInput({ amountCents: 10000, note: '网购' }))
+    database.createExpense(todayInput({
+      entryType: 'income', amountCents: 3000, primaryCategoryId: 'reimbursement', secondaryCategoryId: 'reimbursement.refund',
+      note: '部分退款', transactionKind: 'refund', linkedExpenseId: original.id
+    }))
+    database.createExpense(todayInput({ amountCents: 5000, note: '代付', excludeFromStats: true }))
+    expect(database.getStatistics('month', 'expense').totalCents).toBe(7000)
+    expect(database.getStatistics('month', 'income').totalCents).toBe(0)
+    expect(() => database.deleteExpense(original.id)).toThrow('关联了退款')
+    database.close()
+  })
+
+  it('保存预算、生成日历并确认周期模板', () => {
+    const { database } = createDatabase()
+    const today = formatLocalDate(new Date())
+    const month = today.slice(0, 7)
+    database.createExpense(todayInput({ amountCents: 1250 }))
+    const budget = database.saveBudget({ month, totalCents: 50000, categoryLimits: [{ categoryId: 'food', amountCents: 20000 }] })
+    expect(budget.spentCents).toBe(1250)
+    expect(budget.categories[0]).toMatchObject({ categoryId: 'food', spentCents: 1250 })
+    expect(database.getCalendarMonth(month).days.find((day) => day.date === today)?.count).toBe(1)
+
+    const template = database.saveTemplate({
+      ...todayInput({ amountCents: 3000, note: '固定早餐' }), name: '早餐模板', frequency: 'weekly', nextDueDate: today
+    })
+    database.applyTemplate(template.id)
+    expect(database.listExpenses('all')).toHaveLength(2)
+    expect(database.listTemplates()[0]?.nextDueDate).not.toBe(today)
+    database.close()
+  })
+
+  it('隐私密码使用校验值保存并在重新打开后锁定', () => {
+    const { database, path } = createDatabase()
+    database.setLockPin(null, '1234')
+    expect(database.getLockStatus()).toEqual({ enabled: true, locked: false })
+    database.close()
+    const reopened = new AccountingDatabase(path)
+    expect(reopened.getLockStatus()).toEqual({ enabled: true, locked: true })
+    expect(() => reopened.assertUnlocked()).toThrow('已锁定')
+    expect(() => reopened.unlock('0000')).toThrow('密码不正确')
+    reopened.unlock('1234')
+    expect(() => reopened.assertUnlocked()).not.toThrow()
+    reopened.close()
+  })
+
   it('关闭再打开后数据仍然存在', () => {
     const { database, path } = createDatabase()
     database.createExpense(todayInput())

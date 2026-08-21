@@ -1,9 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog } from 'electron'
-import type { FileOperationResult, RestoreResult } from '../shared/types'
+import type { CsvImportResult, EntryType, ExpenseInput, FileOperationResult, RestoreResult } from '../shared/types'
 import type { AccountingDatabase } from './database'
-import { createBackupDocument, createExpensesCsv, parseBackupDocument } from './data-formats'
+import { createBackupDocument, createExpensesCsv, parseBackupDocument, parseExpensesCsv } from './data-formats'
+import { parseYuanToCents } from '../shared/money'
 
 const timestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 
@@ -83,4 +84,73 @@ export const restoreBackup = async (
     count: document.payload.expenses.length,
     safetyBackupPath
   }
+}
+
+export const importCsv = async (
+  window: BrowserWindow,
+  database: AccountingDatabase,
+  userDataPath: string
+): Promise<CsvImportResult> => {
+  const testPath = process.env.HEIMA_TEST_IMPORT_PATH
+  const selected = testPath
+    ? { canceled: false, filePaths: [testPath] }
+    : await dialog.showOpenDialog(window, {
+      title: '选择要导入的 CSV 账单',
+      properties: ['openFile'],
+      filters: [{ name: 'CSV 表格', extensions: ['csv'] }]
+    })
+  if (selected.canceled || selected.filePaths.length === 0) return { canceled: true }
+
+  const filePath = selected.filePaths[0]!
+  const rows = parseExpensesCsv(await readFile(filePath, 'utf8'))
+  const categories = database.getCategories()
+  const inputs: ExpenseInput[] = []
+  let invalidCount = 0
+  for (const row of rows) {
+    try {
+      const explicitType: EntryType | null = row.entryType === '收入' || row.entryType.toLowerCase() === 'income'
+        ? 'income' : row.entryType === '支出' || row.entryType.toLowerCase() === 'expense' ? 'expense' : null
+      const numeric = row.amount.replace(/[¥￥,\s]/g, '')
+      const amountCents = parseYuanToCents(numeric.replace(/^-/, ''))
+      const entryType = explicitType ?? (numeric.startsWith('-') ? 'expense' : 'income')
+      if (!amountCents) throw new Error('金额无效')
+      const secondaryMatches = categories.filter((category) =>
+        category.parentId !== null && category.entryType === entryType && category.name === row.secondaryCategory)
+      const secondary = row.primaryCategory
+        ? secondaryMatches.find((category) => categories.find((parent) => parent.id === category.parentId)?.name === row.primaryCategory)
+        : secondaryMatches.length === 1 ? secondaryMatches[0] : undefined
+      if (!secondary) throw new Error('分类不存在或名称不唯一')
+      const primary = categories.find((category) => category.id === secondary.parentId)
+      if (!primary) throw new Error('一级分类不存在')
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) throw new Error('日期无效')
+      const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.time) ? row.time : '12:00'
+      if (row.transactionKind && row.transactionKind !== '普通') throw new Error('退款或报销请使用完整备份恢复，以保留原账关联')
+      inputs.push({
+        entryType, amountCents, primaryCategoryId: primary.id, secondaryCategoryId: secondary.id,
+        spentDate: row.date, spentTime: time, note: row.note.slice(0, 200), transactionKind: 'regular',
+        excludeFromStats: row.excludeFromStats === '是', linkedExpenseId: null
+      })
+    } catch { invalidCount += 1 }
+  }
+  if (inputs.length === 0) throw new Error(`没有可导入的有效账目；发现 ${invalidCount} 行无法识别`)
+
+  if (!testPath) {
+    const confirmation = await dialog.showMessageBox(window, {
+      type: 'question',
+      buttons: ['取消', '确认导入'],
+      defaultId: 0,
+      cancelId: 0,
+      title: '确认导入账目',
+      message: `准备导入 ${inputs.length} 笔账目`,
+      detail: `${invalidCount > 0 ? `另有 ${invalidCount} 行无法识别，将跳过。\n` : ''}导入前会自动保存当前完整备份，并跳过重复账目。`
+    })
+    if (confirmation.response !== 1) return { canceled: true }
+  }
+
+  const safetyDirectory = join(userDataPath, 'backups')
+  await mkdir(safetyDirectory, { recursive: true })
+  const safetyBackupPath = join(safetyDirectory, `导入前自动备份-${timestamp()}.heima-backup.json`)
+  await atomicWrite(safetyBackupPath, JSON.stringify(createBackupDocument(database.getBackupPayload(), app.getVersion()), null, 2))
+  const result = database.importExpenses(inputs)
+  return { canceled: false, path: filePath, ...result, invalidCount, safetyBackupPath }
 }
