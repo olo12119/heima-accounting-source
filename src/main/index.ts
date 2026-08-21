@@ -24,7 +24,7 @@ const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     width: 1180,
     height: 760,
-    minWidth: 960,
+    minWidth: 760,
     minHeight: 640,
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#111816' : '#f3f5f2',

@@ -189,9 +189,10 @@ test('完整本地账本流程：收支、分类、导入备份、预算模板�
     await page.getByLabel('隐私密码').fill('2580')
     await page.getByRole('button', { name: '打开账本' }).click()
     await expect(page.getByText('当前结余')).toBeVisible()
-    await running.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(960, 640) })
+    await running.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.setSize(760, 640) })
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '记一笔' }).first()).toBeVisible()
+    await expect(page.locator('.mobile-add')).toBeVisible()
+    await expect(page.locator('.sidebar')).toHaveCSS('position', 'fixed')
     await page.screenshot({ path: join(root, 'test-results', 'minimum-window.png') })
   } finally {
     await running?.close().catch(() => undefined)

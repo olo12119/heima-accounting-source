@@ -6,6 +6,7 @@ coverage/
 playwright-report/
 test-results/
 .cache/
+.tmp/
 *.log
 .DS_Store
 Thumbs.db

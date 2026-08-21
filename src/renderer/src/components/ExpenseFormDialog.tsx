@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, Clock3, Plus, Sparkles, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { CategoryIcon } from './CategoryIcon'
 import { centsToInput, parseYuanToCents } from '../../../shared/money'
 import { formatLocalDate, formatLocalTime } from '../../../shared/dates'
@@ -29,6 +30,7 @@ const fallbackChoices = {
 }
 
 export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | null | undefined; onClose: () => void }): React.JSX.Element {
+  const reduceMotion = useReducedMotion()
   const [categoryCreator, setCategoryCreator] = useState<'primary' | 'secondary' | null>(null)
   const queryClient = useQueryClient()
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: () => window.heima.getCategories() })
@@ -78,8 +80,8 @@ export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | nul
   })
   const typeLabel = entryType === 'income' ? '收入' : '支出'
 
-  return <div className="dialog-backdrop form-backdrop" role="presentation">
-    <section className={`expense-dialog ${entryType}`} role="dialog" aria-modal="true" aria-labelledby="expense-title">
+  return <motion.div className="dialog-backdrop form-backdrop" role="presentation" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : 0.2 }}>
+    <motion.section className={`expense-dialog ${entryType}`} role="dialog" aria-modal="true" aria-labelledby="expense-title" initial={reduceMotion ? false : { opacity: 0, y: 30, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 28 }}>
       <div className="dialog-header"><div><span className="eyebrow">{expense ? '修改记录' : '快速记账'}</span><h2 id="expense-title">{expense ? `编辑这笔${typeLabel}` : `记一笔${typeLabel}`}</h2></div><button className="icon-button" aria-label="关闭" onClick={onClose}><X size={20} /></button></div>
       <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))}>
         <div className="entry-type-switch" aria-label="收支类型">
@@ -97,9 +99,9 @@ export function ExpenseFormDialog({ expense, onClose }: { expense: Expense | nul
         {saveMutation.isError && <div className="form-error" role="alert">{getErrorMessage(saveMutation.error)}</div>}
         <div className="form-footer"><span>按 Enter 快速保存</span><div><button type="button" className="button ghost" onClick={onClose}>取消</button><button type="submit" className="button primary wide" disabled={saveMutation.isPending}>{saveMutation.isPending ? '保存中…' : `保存${typeLabel}`}</button></div></div>
       </form>
-    </section>
+    </motion.section>
     {categoryCreator && <QuickCategoryDialog kind={categoryCreator} entryType={entryType} parent={primaryCategories.find((category) => category.id === primaryId)} onClose={() => setCategoryCreator(null)} onCreated={async (primary, secondary) => { await queryClient.invalidateQueries({ queryKey: ['categories'] }); setValue('primaryCategoryId', primary.id); setValue('secondaryCategoryId', secondary.id); setCategoryCreator(null) }} />}
-  </div>
+  </motion.div>
 }
 
 function QuickCategoryDialog({ kind, entryType, parent, onClose, onCreated }: { kind: 'primary' | 'secondary'; entryType: EntryType; parent?: Category; onClose: () => void; onCreated: (primary: Category, secondary: Category) => Promise<void> }): React.JSX.Element {

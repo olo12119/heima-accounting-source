@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, DatabaseBackup, Download, FileSpreadsheet, HardDrive, Laptop, LockKeyhole, Moon, RotateCcw, Sun, Upload } from 'lucide-react'
+import { BadgeCheck, Check, DatabaseBackup, Download, FileSpreadsheet, HardDrive, Laptop, LockKeyhole, Moon, Palette, RotateCcw, ShieldCheck, Sun, Upload } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import type { ColorTheme, ThemeMode } from '../../../shared/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { getErrorMessage } from '../lib/errors'
@@ -19,6 +20,7 @@ const colorThemes: Array<{ value: ColorTheme; label: string; description: string
 ]
 
 export function SettingsPage(): React.JSX.Element {
+  const reduceMotion = useReducedMotion()
   const [confirmRestore, setConfirmRestore] = useState(false)
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [currentPin, setCurrentPin] = useState('')
@@ -63,9 +65,21 @@ export function SettingsPage(): React.JSX.Element {
     onError: (error) => setMessage({ kind: 'error', text: getErrorMessage(error) })
   })
 
+  const enter = (delay: number) => reduceMotion ? {} : {
+    initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 },
+    transition: { delay, duration: 0.42, ease: [0.22, 1, 0.36, 1] as const }
+  }
+
   return (
-    <div className="settings-grid">
-      <section className="panel settings-section appearance-section">
+    <div className="settings-page">
+      <motion.section className="settings-overview" {...enter(0)}>
+        <div className="settings-overview-mark"><ShieldCheck size={24} /></div>
+        <div><span>LOCAL FIRST · 本地优先</span><strong>外观与数据，由你自己掌控</strong><p>主题、备份和隐私都只作用于这台电脑，不需要登录任何账号。</p></div>
+        <div className="settings-health"><i /><span><strong>账本运行正常</strong><small>数据未上传网络</small></span></div>
+      </motion.section>
+
+      <div className="settings-grid">
+      <motion.section className="panel settings-section appearance-section" {...enter(0.06)}>
         <div className="settings-heading"><div className="settings-icon"><Sun size={20} /></div><div><h2>外观模式</h2><p>选择一个让眼睛舒服的界面。</p></div></div>
         <div className="setting-subheading"><strong>颜色主题</strong><span>主题与明暗可以自由组合</span></div>
         <div className="palette-grid">
@@ -87,9 +101,24 @@ export function SettingsPage(): React.JSX.Element {
             </button>
           })}
         </div>
-      </section>
+      </motion.section>
 
-      <section className="panel settings-section data-section">
+      <motion.section className="panel settings-section privacy-section" {...enter(0.12)}>
+        <div className="settings-heading"><div className="settings-icon"><LockKeyhole size={20} /></div><div><h2>隐私密码</h2><p>防止身边的人随手打开查看账目。</p></div></div>
+        <div className="pin-setting">
+          <div><strong>{lockQuery.data?.enabled ? '保护已开启' : '保护未开启'}</strong><small>密码仅在本机校验；它不是数据库文件加密。</small></div>
+          <input aria-label={lockQuery.data?.enabled ? '当前隐私密码' : '新隐私密码'} type="password" inputMode="numeric" maxLength={12} value={lockQuery.data?.enabled ? currentPin : newPin} onChange={(event) => lockQuery.data?.enabled ? setCurrentPin(event.target.value.replace(/\D/g, '')) : setNewPin(event.target.value.replace(/\D/g, ''))} placeholder={lockQuery.data?.enabled ? '输入当前密码以关闭' : '设置4至12位数字'} />
+          <button className={`button ${lockQuery.data?.enabled ? 'ghost' : 'primary'}`} disabled={lockMutation.isPending || (lockQuery.data?.enabled ? currentPin.length < 4 : newPin.length < 4)} onClick={() => lockMutation.mutate()}>{lockQuery.data?.enabled ? '关闭密码' : '开启密码'}</button>
+        </div>
+      </motion.section>
+
+      <motion.section className="panel settings-section storage-section" {...enter(0.16)}>
+        <div className="settings-heading"><div className="settings-icon"><HardDrive size={20} /></div><div><h2>本地数据</h2><p>你的账目只保存在这台电脑上。</p></div></div>
+        <div className="storage-info"><span className="status-dot" /><div><strong>数据库运行正常</strong><code>{statusQuery.data?.databasePath}</code></div></div>
+        <div className="privacy-points"><span><Check size={15} />无需联网</span><span><Check size={15} />无需账号</span><span><Check size={15} />不会上传数据</span></div>
+      </motion.section>
+
+      <motion.section className="panel settings-section data-section" {...enter(0.2)}>
         <div className="settings-heading"><div className="settings-icon"><DatabaseBackup size={20} /></div><div><h2>导出与备份</h2><p>把账目带走，或为全部数据留一份副本。</p></div></div>
         <div className="data-actions">
           <div><span className="action-icon"><Upload size={20} /></span><span><strong>导入 CSV 账单</strong><small>导入前预览数量、跳过重复并自动备份</small></span><button className="button secondary" disabled={operation.isPending} onClick={() => operation.mutate('import')}><Upload size={16} />导入</button></div>
@@ -98,24 +127,15 @@ export function SettingsPage(): React.JSX.Element {
           <div><span className="action-icon warm"><RotateCcw size={20} /></span><span><strong>从备份恢复</strong><small>恢复前会自动保存当前数据</small></span><button className="button ghost" disabled={operation.isPending} onClick={() => setConfirmRestore(true)}><RotateCcw size={16} />恢复</button></div>
         </div>
         {message && <div className={`operation-message ${message.kind}`} role="status">{message.text}</div>}
-      </section>
+      </motion.section>
+      </div>
 
-      <section className="panel settings-section privacy-section">
-        <div className="settings-heading"><div className="settings-icon"><LockKeyhole size={20} /></div><div><h2>隐私密码</h2><p>防止身边的人随手打开查看账目。</p></div></div>
-        <div className="pin-setting">
-          <div><strong>{lockQuery.data?.enabled ? '保护已开启' : '保护未开启'}</strong><small>密码仅在本机校验；它不是数据库文件加密。</small></div>
-          <input aria-label={lockQuery.data?.enabled ? '当前隐私密码' : '新隐私密码'} type="password" inputMode="numeric" maxLength={12} value={lockQuery.data?.enabled ? currentPin : newPin} onChange={(event) => lockQuery.data?.enabled ? setCurrentPin(event.target.value.replace(/\D/g, '')) : setNewPin(event.target.value.replace(/\D/g, ''))} placeholder={lockQuery.data?.enabled ? '输入当前密码以关闭' : '设置4至12位数字'} />
-          <button className={`button ${lockQuery.data?.enabled ? 'ghost' : 'primary'}`} disabled={lockMutation.isPending || (lockQuery.data?.enabled ? currentPin.length < 4 : newPin.length < 4)} onClick={() => lockMutation.mutate()}>{lockQuery.data?.enabled ? '关闭密码' : '开启密码'}</button>
-        </div>
-      </section>
-
-      <section className="panel settings-section storage-section">
-        <div className="settings-heading"><div className="settings-icon"><HardDrive size={20} /></div><div><h2>本地数据</h2><p>你的账目只保存在这台电脑上。</p></div></div>
-        <div className="storage-info"><span className="status-dot" /><div><strong>数据库运行正常</strong><code>{statusQuery.data?.databasePath}</code></div></div>
-        <div className="privacy-points"><span><Check size={15} />无需联网</span><span><Check size={15} />无需账号</span><span><Check size={15} />不会上传数据</span></div>
-      </section>
-
-      <section className="about-card"><img src="./logo.svg" alt="" /><div><strong>黑马记账</strong><span>版本 {statusQuery.data?.version ?? '1.0.0'}</span></div><p>简单、清楚地知道自己的钱花到哪里去了。</p></section>
+      <motion.section className="about-strip" {...enter(0.25)}>
+        <img src="./logo-app-v2.png" alt="" />
+        <div><strong>黑马记账</strong><span>版本 {statusQuery.data?.version ?? '1.0.0'} · 本地个人收支账本</span></div>
+        <span><BadgeCheck size={16} />数据由你保管</span>
+        <span><Palette size={16} />界面可自由搭配</span>
+      </motion.section>
 
       <ConfirmDialog
         open={confirmRestore}
