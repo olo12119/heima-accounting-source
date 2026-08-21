@@ -1,0 +1,47 @@
+# 黑马记账架构说明
+
+## 用普通话解释 App 的组成
+
+黑马记账可以理解为四层：
+
+1. **你看到的界面**：首页、记账表单、账单、统计和设置，位于 `src/renderer`。
+2. **安全传话层**：界面不能直接碰电脑文件，只能通过 `src/preload` 暴露的少量固定操作提出请求。
+3. **应用管家**：`src/main` 接收请求、再次检查数据、读写数据库、弹出文件选择框，并负责创建桌面窗口。
+4. **本地账本**：SQLite 文件保存分类、账目和主题设置。关闭 App 后数据仍在。
+
+流程如下：
+
+```text
+用户点击保存
+  → React 表单先检查
+  → preload 只传递允许的字段
+  → 主进程用 Zod 再检查
+  → SQLite 事务写入
+  → 界面重新读取首页、账单和统计
+```
+
+## 数据放在哪里
+
+- Windows：`%APPDATA%\HeimaAccounting\data\heima-accounting.sqlite3`
+- macOS：`~/Library/Application Support/HeimaAccounting/data/heima-accounting.sqlite3`
+
+SQLite 还可能在数据库旁短暂保留 `-wal` 和 `-shm` 文件，它们是数据库保证安全写入的一部分，不应在 App 运行时单独删除或复制。
+
+## 主要模块
+
+- `src/shared`：双方都能理解的数据类型、分类、金额、日期和校验规则。
+- `src/main/database.ts`：建表、迁移、分类初始化、增删改查与统计。
+- `src/main/data-formats.ts`：CSV、备份、稳定校验值。
+- `src/main/portability.ts`：系统文件选择、原子写入、安全备份与恢复。
+- `src/main/ipc.ts`：允许的请求清单和来源验证。
+- `src/renderer/src/components`：导航、记账表单、确认框等可复用界面。
+- `src/renderer/src/pages`：首页、账单、统计、数据与设置。
+- `tests`：纯逻辑、SQLite、React 交互和真实 Electron 操作测试。
+
+## 数据安全策略
+
+- 钱不用小数保存，而是把12.50元保存成1250分，避免计算误差。
+- 每个二级分类必须属于选定的一级分类，并且两级分类都必须匹配收入或支出类型。
+- 数据库迁移第2版为旧账目补上 `expense` 类型，旧支出数据原样保留。
+- 恢复备份时先保存当前账本，整个替换要么全部成功，要么完全不生效。
+- 数据库检查失败时保留原文件，等待用户使用备份恢复，不用空数据库覆盖它。

@@ -1,0 +1,20 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/src/**/*",
+    "src/shared/**/*",
+    "tests/renderer/**/*",
+    "vitest.setup.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@renderer/*": ["src/renderer/src/*"],
+      "@shared/*": ["src/shared/*"]
+    },
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "noUncheckedIndexedAccess": true
+  }
+}
