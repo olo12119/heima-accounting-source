@@ -3,21 +3,27 @@
 黑马记账现在是一个包含两条产品线的项目：
 
 - **Windows桌面版**：1.5.0免安装预览版，已实现完整收支记账功能，仍然可正常打开。
-- **Android手机版**：已完成第一版完整UI/UX设计文档，尚未开始正式编码，目前没有APK。
+- **Android手机版**：已完成原生工程和第一轮真机反馈修正，当前可安装版本为 `0.2.0-visual`。
 
 两者已经分开放置，不会把Windows的Electron文件混入Android原生工程。iCost、Apple原生应用和Liquid Glass只是设计参考，黑马记账下一阶段只开发Android，不制作iOS应用。
 
-## 你现在怎样打开
+## 你现在怎样打开或安装
 
-当前唯一可运行成品是Windows桌面版。请在项目根目录双击：
+当前项目重点是Android。请把下面这个文件复制到安卓手机并安装：
+
+```text
+手机安装包/黑马记账-Android-视觉修正版-0.2.0.apk
+```
+
+逐步说明在同文件夹的 `手机安装说明.txt`。它是视觉修正版，暂时不会永久保存账目。
+
+如需打开旧的Windows桌面版，请在项目根目录双击：
 
 ```text
 00-打开Windows桌面版-1.5.0.cmd
 ```
 
-它会打开1.5.0免安装预览版。旧的 `00-点我打开黑马记账-当前最新版.cmd` 仍然保留为兼容入口，但以后请优先使用名称更清楚的新入口。
-
-Android现在只能阅读设计方案，还不能安装到手机。请从 [Android设计文档索引](docs/android/README.md) 开始查看。
+它会打开1.5.0免安装预览版。旧的 `00-点我打开黑马记账-当前最新版.cmd` 仍然保留为兼容入口。Windows版和Android版是两条独立产品线，不要把Windows的EXE复制到手机。
 
 ## 项目地图
 
@@ -25,10 +31,11 @@ Android现在只能阅读设计方案，还不能安装到手机。请从 [Andro
 黑马记账app/
 ├─ apps/
 │  ├─ windows-desktop/   已完成的Windows桌面版源码、测试和预览成品
-│  └─ android/           未来Android原生工程位置，当前只有说明
-├─ design/android/         未来高保真原型和视觉稿位置
+│  └─ android/           Android原生源码、测试和构建脚本
+├─ design/android/         Android高保真原型和视觉稿
 ├─ docs/android/           Android UI/UX、动效、主题和技术方案
 ├─ docs/                   通用及Windows桌面版文档
+├─ 手机安装包/             当前与历史Android APK及安装说明
 └─ shared/contracts/       未来两端备份格式的共用说明
 ```
 

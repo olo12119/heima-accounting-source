@@ -33,14 +33,14 @@ import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
 
 @Composable
-fun StatisticsScreen() {
+fun StatisticsScreen(amountsVisible: Boolean) {
     val palette = HeimaTheme.palette
     var period by remember { mutableIntStateOf(2) }
     val periods = listOf("今日", "本周", "本月")
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 58.dp, bottom = 128.dp),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item { ScreenHeading(title = "统计", eyebrow = "读懂每一笔真实收支") }
@@ -77,7 +77,7 @@ fun StatisticsScreen() {
                 Column(Modifier.padding(22.dp)) {
                     Text("本月总览", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
-                    Text("¥0.00", color = palette.textPrimary, style = MaterialTheme.typography.displayLarge)
+                    Text(if (amountsVisible) "¥0.00" else "¥••••", color = palette.textPrimary, style = MaterialTheme.typography.displayLarge)
                     Spacer(Modifier.height(4.dp))
                     Text("暂无账目，统计会在记账后自动生成", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -111,8 +111,8 @@ fun StatisticsScreen() {
                         Text("暂无\n数据", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        LegendDot("支出", "¥0.00", palette.expense)
-                        LegendDot("收入", "¥0.00", palette.income)
+                        LegendDot("支出", if (amountsVisible) "¥0.00" else "¥••••", palette.expense)
+                        LegendDot("收入", if (amountsVisible) "¥0.00" else "¥••••", palette.income)
                         Text("数据只来自你的真实账目", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                     }
                 }

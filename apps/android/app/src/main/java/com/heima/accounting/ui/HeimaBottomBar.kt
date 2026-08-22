@@ -3,11 +3,15 @@ package com.heima.accounting.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,17 +21,21 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -43,39 +51,86 @@ fun HeimaBottomBar(
     recordPanelVisible: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
 
-    GlassSurface(
+    Box(
         modifier = modifier
-            .padding(horizontal = 14.dp)
             .fillMaxWidth()
-            .height(76.dp),
-        cornerRadius = 30.dp,
-        elevation = 18.dp,
+            .height(108.dp)
+            .padding(horizontal = 14.dp),
     ) {
-        Row(
+        GlassSurface(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .height(76.dp),
+            cornerRadius = 31.dp,
+            elevation = 20.dp,
+            backdropBlur = true,
         ) {
-            AppDestination.entries.forEach { destination ->
-                if (destination == AppDestination.RECORD) {
-                    RecordAction(
-                        expanded = recordPanelVisible,
-                        reduceMotion = motion.reduceMotion,
-                        onClick = onRecord,
-                    )
-                } else {
-                    BottomBarItem(
-                        destination = destination,
-                        selected = selected == destination,
-                        onClick = { onDestinationSelected(destination) },
-                    )
+            BoxWithConstraints(Modifier.matchParentSize()) {
+                val slotWidth = maxWidth / AppDestination.entries.size
+                val indicatorWidth = 54.dp
+                val targetX = slotWidth * selected.ordinal + (slotWidth - indicatorWidth) / 2
+                val indicatorX by animateDpAsState(
+                    targetValue = targetX,
+                    animationSpec = if (motion.reduceMotion) {
+                        spring(stiffness = Spring.StiffnessHigh)
+                    } else {
+                        spring(
+                            dampingRatio = 0.72f,
+                            stiffness = Spring.StiffnessLow,
+                        )
+                    },
+                    label = "bottom_bar_glass_lens",
+                )
+
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(indicatorX.roundToPx(), 17.dp.roundToPx())
+                        }
+                        .width(indicatorWidth)
+                        .height(38.dp)
+                        .shadow(8.dp, RoundedCornerShape(20.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    palette.brandSoft.copy(alpha = 0.92f),
+                                    palette.glassHighlight.copy(alpha = 0.78f),
+                                ),
+                            ),
+                            RoundedCornerShape(20.dp),
+                        ),
+                )
+
+                Row(
+                    modifier = Modifier.matchParentSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppDestination.entries.forEach { destination ->
+                        if (destination == AppDestination.RECORD) {
+                            Spacer(Modifier.weight(1f))
+                        } else {
+                            BottomBarItem(
+                                destination = destination,
+                                selected = selected == destination,
+                                onClick = { onDestinationSelected(destination) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
         }
+
+        RecordAction(
+            expanded = recordPanelVisible,
+            reduceMotion = motion.reduceMotion,
+            onClick = onRecord,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 
@@ -84,45 +139,49 @@ private fun BottomBarItem(
     destination: AppDestination,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val palette = HeimaTheme.palette
+    val motion = HeimaTheme.motion
     val color by animateColorAsState(
         targetValue = if (selected) palette.brand else palette.textTertiary,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "nav_item_color",
     )
-    val indicatorWidth by animateDpAsState(
-        targetValue = if (selected) 48.dp else 0.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "nav_indicator_width",
+    val selection by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = if (motion.reduceMotion) {
+            spring(stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+        },
+        label = "nav_item_selection",
     )
 
     Column(
-        modifier = Modifier
-            .widthIn(min = 58.dp)
-            .height(68.dp)
+        modifier = modifier
+            .height(76.dp)
             .semantics { contentDescription = destination.accessibilityLabel }
-            .then(Modifier.simpleClick(onClick)),
+            .clickable(role = Role.Tab, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Box(
-                modifier = Modifier
-                    .width(indicatorWidth)
-                    .height(30.dp)
-                    .background(palette.brandSoft.copy(alpha = 0.72f), RoundedCornerShape(18.dp)),
-            )
-            HeimaGlyph(
-                destination = destination,
-                color = color,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        Spacer(Modifier.height(3.dp))
+        HeimaGlyph(
+            destination = destination,
+            color = color,
+            modifier = Modifier
+                .size(22.dp)
+                .graphicsLayer {
+                    scaleX = 1f + selection * 0.08f
+                    scaleY = 1f + selection * 0.08f
+                    translationY = -selection * 1.5.dp.toPx()
+                },
+        )
+        Spacer(Modifier.height(4.dp))
         Text(
             text = destination.label,
             color = color,
-            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
         )
     }
@@ -133,62 +192,76 @@ private fun RecordAction(
     expanded: Boolean,
     reduceMotion: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val palette = HeimaTheme.palette
-    val targetScale = if (expanded && !reduceMotion) 0.88f else 1f
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = targetScale,
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = when {
+            reduceMotion -> 1f
+            expanded -> 0.88f
+            pressed -> 0.94f
+            else -> 1f
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
+            stiffness = Spring.StiffnessMediumLow,
         ),
         label = "record_action_scale",
     )
 
     Column(
-        modifier = Modifier
-            .widthIn(min = 70.dp)
-            .offset(y = (-12).dp)
+        modifier = modifier
             .semantics { contentDescription = AppDestination.RECORD.accessibilityLabel }
-            .then(Modifier.simpleClick(onClick)),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
+        GlassSurface(
             modifier = Modifier
-                .size(62.dp)
+                .size(70.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                }
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    ambientColor = palette.brand.copy(alpha = 0.30f),
-                    spotColor = palette.brand.copy(alpha = 0.34f),
-                )
-                .background(
-                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(palette.accent, palette.brand),
-                    ),
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
+                },
+            cornerRadius = 36.dp,
+            elevation = 22.dp,
+            backdropBlur = true,
         ) {
-            HeimaGlyph(
-                destination = AppDestination.RECORD,
-                color = Color.White,
-                modifier = Modifier.size(27.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(5.dp)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                palette.accent.copy(alpha = 0.94f),
+                                palette.brand.copy(alpha = 0.98f),
+                            ),
+                            center = androidx.compose.ui.geometry.Offset(20f, 14f),
+                        ),
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                HeimaGlyph(
+                    destination = AppDestination.RECORD,
+                    color = Color.White,
+                    modifier = Modifier.size(31.dp),
+                )
+            }
         }
         Spacer(Modifier.height(2.dp))
         Text(
             text = "记账",
             color = palette.brand,
-            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
-
-private fun Modifier.simpleClick(onClick: () -> Unit): Modifier =
-    clickable(onClick = onClick)

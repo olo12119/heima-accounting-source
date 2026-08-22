@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 
 @Composable
 fun HeimaGlyph(
@@ -50,9 +51,41 @@ fun HeimaGlyph(
             }
 
             AppDestination.RECORD -> {
-                drawLine(color, Offset(w * 0.28f, h * 0.72f), Offset(w * 0.70f, h * 0.30f), strokeWidth * 1.05f, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.23f, h * 0.78f), Offset(w * 0.37f, h * 0.74f), strokeWidth * 0.85f, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.62f, h * 0.25f), Offset(w * 0.75f, h * 0.38f), strokeWidth * 0.7f, StrokeCap.Round)
+                rotate(42f, pivot = Offset(w * 0.50f, h * 0.48f)) {
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(w * 0.40f, h * 0.17f),
+                        size = androidx.compose.ui.geometry.Size(w * 0.20f, h * 0.52f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.08f),
+                    )
+                    drawRoundRect(
+                        color = color.copy(alpha = 0.82f),
+                        topLeft = Offset(w * 0.385f, h * 0.12f),
+                        size = androidx.compose.ui.geometry.Size(w * 0.23f, h * 0.13f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.06f),
+                    )
+                    val nib = Path().apply {
+                        moveTo(w * 0.40f, h * 0.65f)
+                        lineTo(w * 0.60f, h * 0.65f)
+                        lineTo(w * 0.50f, h * 0.86f)
+                        close()
+                    }
+                    drawPath(nib, color = color)
+                    drawCircle(
+                        color = color.copy(alpha = 0.48f),
+                        radius = w * 0.025f,
+                        center = Offset(w * 0.50f, h * 0.74f),
+                    )
+                }
+                val writingLine = Path().apply {
+                    moveTo(w * 0.16f, h * 0.84f)
+                    cubicTo(w * 0.32f, h * 0.77f, w * 0.52f, h * 0.91f, w * 0.82f, h * 0.81f)
+                }
+                drawPath(
+                    path = writingLine,
+                    color = color.copy(alpha = 0.76f),
+                    style = Stroke(width = strokeWidth * 0.58f, cap = StrokeCap.Round),
+                )
             }
 
             AppDestination.BUDGET -> {

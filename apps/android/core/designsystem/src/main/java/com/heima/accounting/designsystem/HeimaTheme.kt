@@ -16,8 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 enum class HeimaThemeStyle {
-    LIQUID_GLASS,
+    CLEAR_BLUE,
     NATURE_HEALING,
+}
+
+enum class HeimaColorMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
 }
 
 enum class VisualQuality {
@@ -262,7 +268,7 @@ fun HeimaAccountingTheme(
     content: @Composable () -> Unit,
 ) {
     val palette = when (style) {
-        HeimaThemeStyle.LIQUID_GLASS -> if (darkTheme) LiquidDark else LiquidLight
+        HeimaThemeStyle.CLEAR_BLUE -> if (darkTheme) LiquidDark else LiquidLight
         HeimaThemeStyle.NATURE_HEALING -> if (darkTheme) NatureDark else NatureLight
     }
 
@@ -277,4 +283,3 @@ fun HeimaAccountingTheme(
         )
     }
 }
-

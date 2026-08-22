@@ -129,7 +129,7 @@ apps/android/
 ## Windows与Android工程边界
 
 - `apps/windows-desktop`：冻结的Electron桌面版，只修复数据安全或迁移相关问题。
-- `apps/android`：未来Android原生工程，原型确认前不写正式代码。
+- `apps/android`：已经建立的Android原生工程；当前完成视觉修正版，正式数据层仍按本文件规则逐步接入。
 - `docs/android`：Android产品与设计规范。
 - `design/android`：高保真原型与动效演示。
 - `shared/contracts`：跨版本备份格式和固定业务规则。

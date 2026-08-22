@@ -31,7 +31,7 @@ fun BudgetScreen() {
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 58.dp, bottom = 128.dp),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item { ScreenHeading(title = "预算", eyebrow = "给生活留一点从容") }
