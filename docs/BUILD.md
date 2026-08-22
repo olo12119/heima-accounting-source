@@ -1,55 +1,72 @@
 # 黑马记账构建说明
 
+## 先分清两个项目
+
+- Windows桌面版的完整Electron工程在 `apps/windows-desktop`。
+- Android手机版当前只有设计文档，还没有Gradle工程、源码或APK，因此没有Android构建命令。
+
+下面的命令全部只针对Windows桌面版。
+
 ## 当前验证环境
 
-- Windows x64，系统内部版本 26100
+- Windows x64，系统内部版本26100
 - Node.js 24.19.0、npm 11.17.0
-- Electron 43.4.1（内置 Node 24.18.1）
+- Electron 43.4.1（内置Node 24.18.1）
 - Git 2.55.0、PowerShell 5.1
-- 不需要 Rust、Cargo、Flutter 或 Visual Studio C++ Build Tools
+- Windows桌面版不需要Rust、Cargo、Flutter或Visual Studio C++ Build Tools
 
-项目路径可以包含中文和空格，当前项目已经在该路径完成类型检查、测试、Electron 启动和构建。
+当前Windows源码版本为1.5.0预览版。目录分离后已在中文和空格路径下完成类型检查、测试、Electron启动和生产构建。
 
-当前源码版本为1.5.0预览版。用户决定先体验功能再制作安装包，因此没有生成1.5.0 Windows安装版或单文件便携版，`release` 中仍是旧1.0.0/1.1.0产物。
+## 普通用户打开方式
 
-已经生成可直接打开的1.5.0免安装目录：`可直接打开-黑马记账-1.5.0预览版/win-unpacked`，共143个文件、约488.2MB。普通用户不应进入内部寻找EXE，直接双击根目录 `00-点我打开黑马记账-当前最新版.cmd`。
+不需要输入任何命令。在项目根目录双击：
 
-## 安装依赖
-
-在项目根目录打开 PowerShell：
-
-```powershell
-npm install
+```text
+00-打开Windows桌面版-1.5.0.cmd
 ```
 
-如果PowerShell提示禁止运行 `npm.ps1`，不需要修改系统安全策略，把命令中的 `npm` 换成 `npm.cmd` 即可，例如 `npm.cmd run dev`。
-
-依赖安装在项目的 `node_modules`，npm 缓存位于 `.cache/npm`。Electron 43 会在第一次运行时下载官方运行时。如果下载中断，可重试：
-
-```powershell
-npm exec install-electron -- --no
-```
+该入口会找到 `apps/windows-desktop/可直接打开-黑马记账-1.5.0预览版/win-unpacked/HeimaAccounting.exe`。这是免安装预览版，整个 `win-unpacked` 文件夹必须保留。
 
 ## 开发与检查
 
+在项目根目录打开PowerShell，先进入Windows工程：
+
 ```powershell
-npm run dev
-npm run typecheck
-npm run lint
-npm test
-npm run test:e2e
-npm run build
-npm run test:packaged
+Set-Location ".\apps\windows-desktop"
 ```
 
-`test:e2e` 会启动 Electron 并使用系统临时目录中的独立测试数据库，不会修改正式账本。
-当前测试环境的Electron子进程需要在Playwright启动参数中关闭GPU和测试沙箱；这些参数只存在于测试文件，正式App仍保持渲染进程沙箱、上下文隔离和硬件加速。
+第一次或依赖缺失时安装程序零件：
 
-## Windows 构建
+```powershell
+npm.cmd install
+```
 
-### 生成免安装预览目录
+源码临时启动：
 
-这不是安装包，不会向Windows安装程序。先执行生产构建，再让electron-builder生成解压运行目录：
+```powershell
+npm.cmd run dev
+```
+
+这种方式出现的PowerShell窗口需要保持打开，直到应用关闭。
+
+完整检查：
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd test
+npm.cmd run test:e2e
+npm.cmd run build
+npm.cmd run test:packaged
+```
+
+`test:e2e` 使用独立的测试数据库，不会修改正式个人账本。
+
+## Windows成品
+
+### 当前已有：1.5.0免安装预览版
+
+它不向Windows安装程序，用于在制作正式安装包前验收。如需重新生成：
 
 ```powershell
 $env:ELECTRON_BUILDER_CACHE = "$PWD\.cache\electron-builder"
@@ -57,52 +74,26 @@ npm.cmd run build
 npm.cmd exec electron-builder -- --dir --win --x64 "--config.directories.output=可直接打开-黑马记账-1.5.0预览版"
 ```
 
-测试当前免安装程序：
+### 当前尚未制作：1.5.0安装版和单文件便携版
+
+用户已决定等体验满意后再制作。`apps/windows-desktop/release` 中目前主要是旧1.0.0/1.1.0成品，不得称为当前1.5.0版。
+
+将来获得用户同意后才执行：
 
 ```powershell
-$env:HEIMA_PACKAGED_EXE = "$PWD\可直接打开-黑马记账-1.5.0预览版\win-unpacked\HeimaAccounting.exe"
-npm.cmd run test:packaged
+npm.cmd run dist:win
 ```
 
-自动测试为了适应受控环境，会使用测试专用的关闭GPU和测试沙箱参数；普通用户启动文件不带这些参数，正式App仍保留原安全配置。
+未购买代码签名证书，所以Windows SmartScreen可能显示“未知发布者”。
 
-### 生成安装版和单文件便携版
+## macOS历史支持说明
 
-```powershell
-npm run dist:win
-```
+Windows桌面版的Electron代码仍保留macOS构建配置，但只能在真实Mac上构建和验证DMG/ZIP。本项目没有在Windows上伪造macOS构建成功。这与新的Android开发方向互不影响。
 
-执行打包后，新产物会位于 `release`。当前实际存在的是1.1.0产物：
+## 图标位置
 
-- `HeimaAccounting-Setup-1.1.0-x64.exe`：带安装向导的 NSIS 安装包。
-- `HeimaAccounting-Portable-1.1.0-x64.exe`：无需安装的便携版。
-- `win-unpacked\HeimaAccounting.exe`：解压运行目录中的主程序。
+- 运行时应用图标：`apps/windows-desktop/src/renderer/public/logo-app-v3.png`
+- Windows/macOS构建图标：`apps/windows-desktop/build/icon.png`
+- 3D分类图标图集：`apps/windows-desktop/src/renderer/public/category-3d-atlas-v2.png`
 
-在用户确认1.5.0预览版之前不要把上述文件误称为1.5.0安装版。确认后再执行 `npm run dist:win`，预期生成带1.5.0版本号的新文件。
-
-当前产物没有代码签名证书，Windows SmartScreen 可能显示“未知发布者”。这是签名限制，不是程序损坏。
-
-## macOS 构建
-
-必须在真实 Mac 上安装 Node.js 24 和 Xcode Command Line Tools，然后从同一项目代码执行：
-
-```bash
-npm ci
-npm run typecheck
-npm test
-npm run build
-npm run dist:mac -- --arm64
-npm run dist:mac -- --x64
-```
-
-产物是对应架构的 DMG 和 ZIP，位于 `release`。没有 Apple Developer 账号时可以本机测试未签名 App，但对外发布前应完成 Apple 签名和公证。本项目没有在 Windows 上伪造 macOS 构建成功。
-
-## 图标
-
-新版AI品牌原图经过项目脚本缩放为 `src/renderer/public/logo-app-v3.png` 与 `build/icon.png`。Windows 上可重新生成512像素构建图标：
-
-```powershell
-npm run icons
-```
-
-界面中的立体分类图标位于 `src/renderer/public/category-3d-atlas-v2.png`。这是运行时资源，必须保留并由Git管理；它不是构建缓存，不应在清理项目时删除。
+这些是程序资源，不是缓存，由Git保存。

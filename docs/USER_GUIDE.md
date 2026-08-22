@@ -7,16 +7,19 @@
 唯一推荐方式：返回项目根目录，双击：
 
 ```text
-00-点我打开黑马记账-当前最新版.cmd
+00-打开Windows桌面版-1.5.0.cmd
 ```
 
-它会打开 `可直接打开-黑马记账-1.5.0预览版` 中的程序，不需要安装，也不需要保持PowerShell窗口开启。整个免安装文件夹必须保留，不能只把里面的 `HeimaAccounting.exe` 单独复制出去。
+它会打开 `apps/windows-desktop/可直接打开-黑马记账-1.5.0预览版` 中的程序，不需要安装，也不需要保持PowerShell窗口开启。整个免安装文件夹必须保留，不能只把里面的 `HeimaAccounting.exe` 单独复制出去。
 
 只有免安装目录被清理时，启动按钮才会自动改用以下源码命令：
 
 ```powershell
+Set-Location ".\apps\windows-desktop"
 npm.cmd run dev
 ```
+
+> 这份指南讲的是已经可运行的Windows桌面版。Android版目前只完成设计文档，还没有APK；手机版阶段说明见 [Android设计文档](android/README.md)。
 
 源码方式需要保持PowerShell窗口打开；关闭黑马记账后再关闭PowerShell。两种方式读取相同的正式本地账本，首次体验重要数据前建议先导出完整备份。
 

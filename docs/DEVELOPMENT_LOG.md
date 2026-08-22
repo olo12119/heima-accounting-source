@@ -12,6 +12,48 @@
 
 ---
 
+## 2026-08-22：更换白底应用图标、安全分离Windows/Android与完成Android UI规划
+
+### 需求背景与方向更正
+
+用户明确手机主力设备是Android，之前提到iCost、iOS、Apple原生应用、visionOS和Liquid Glass只是希望借鉴它们的信息组织、留白、材质和动效，不是要制作iOS应用。因此移动端方向固定为Android原生Kotlin + Jetpack Compose，并遵守“先完整设计文档、再高保真原型、用户确认后才编码”的阶段。
+
+### 安全存档与文件整理
+
+- 先确认Git工作区只有两个新图标文件被修改，再创建图标安全存档 `393e21a feat: 更换白底账本人民币应用图标`。
+- 经用户明确同意后，把已有Electron源码、测试、配置、依赖、缓存、构建产物和历史预览目录整体移入 `apps/windows-desktop`。操作前验证了目标绝对路径仍在项目内，目标目录不存在；过程中没有执行递归删除。
+- 根目录新增明确入口 `00-打开Windows桌面版-1.5.0.cmd`，会在新位置查找免安装EXE，找不到时才退回源码启动。旧的“当前最新版”入口保留为兼容转发，避免用户原有习惯突然失效。
+- 兼容转发脚本第一次直接写入新的中文文件名，Windows `cmd.exe` 实际检查返回“命令语法不正确”。根因是无BOM的UTF-8批处理文件在旧解析器中处理中文路径不稳定；改为只用ASCII通配模式查找新入口后，新旧两个启动按钮都正确找到同一个1.5.0 EXE。
+- Windows个人账目数据位于 `%APPDATA%\HeimaAccounting`，本次没有读写、移动、删除或重建该目录。
+
+### Android设计交付范围
+
+- `apps/android` 只创建阶段说明，尚未创建Kotlin、Gradle或Compose正式工程，没有APK。
+- `docs/android` 新增产品定位、五标签页面结构、Design System、四套整体主题、字体商店、高级动效、Android技术与数据迁移、原型顺序和100分验收表。
+- 首页结构完整覆盖今日消费、本月趋势、剩余预算、财务健康、分类消费、可视化数据和最近账单；底部使用首页/统计/记账/预算/我的五项Tab Bar。
+- 四套主题为Apple Liquid Glass、中世纪机械幻想、未来科技和自然治愈。它们不是换一个主色，而是共同更换材质、形状、字体、图表、图标底座、声音/触感和动效语言；同时规定了低端Android设备的降级方案和减少动效无障碍模式。
+- `design/android` 预留高保真页面、主题、组件和动效稿的独立位置；`shared/contracts` 预留两端备份迁移规则，当前未改动Windows备份格式。
+
+### 真实验证结果
+
+所有以下命令都在目录分离后、`apps/windows-desktop` 内执行：
+
+- `npm.cmd run typecheck`：通过。
+- `npm.cmd run lint`：通过。
+- `npm.cmd test`：8个测试文件、38项测试全部通过。
+- `npm.cmd run build`：生产构建通过。
+- `npm.cmd run test:e2e`：1项Electron完整流程通过，用时30.5秒。
+- `npm.cmd run test:packaged`：1项免安装成品启动冒烟测试通过，用时1.1秒。
+- 新启动入口和旧兼容入口路径检查：两者都正确找到 `apps/windows-desktop`内的1.5.0 `HeimaAccounting.exe`。
+
+### 当前限制
+
+- Android只完成UI/UX设计文档，还没有高保真可点击原型、正式代码、真机测试或APK。
+- Windows 1.5.0仍是免安装预览版，没有新的1.5.0安装包。
+- Windows与Android备份互导只有安全设计原则，尚未实现和验证，不宣称可用。
+
+---
+
 ## 2026-08-21：1.5.0 三套心情主题、白底图标与记账体验精修
 
 ### 需求背景与设计取舍

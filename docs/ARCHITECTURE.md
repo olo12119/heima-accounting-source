@@ -1,22 +1,22 @@
-# 黑马记账架构说明
+# 黑马记账Windows桌面版架构说明
 
-## 用普通话解释 App 的组成
+> Windows Electron工程已整体位于 `apps/windows-desktop`。本文档解释已实现的桌面版；Android原生App的规划见 [Android技术与数据方案](android/TECH_AND_DATA_PLAN.md)。
 
-黑马记账可以理解为四层：
+## 用普通话解释App的组成
 
-1. **你看到的界面**：首页、记账表单、账单/日历、统计、分类管理、预算与计划、设置和密码锁，位于 `src/renderer`。
-2. **安全传话层**：界面不能直接碰电脑文件，只能通过 `src/preload` 暴露的少量固定操作提出请求。
-3. **应用管家**：`src/main` 接收请求、再次检查数据、读写数据库、弹出文件选择框，并负责创建桌面窗口。
-4. **本地账本**：SQLite 文件保存分类、账目和主题设置。关闭 App 后数据仍在。
+可以把Windows版理解为四层：
 
-流程如下：
+1. **你看到的界面**：首页、记账表单、账单/日历、统计、分类管理、预算与计划、设置和密码锁，位于 `apps/windows-desktop/src/renderer`。
+2. **安全传话层**：界面不能直接碰电脑文件，只能通过 `apps/windows-desktop/src/preload` 提出固定请求。
+3. **应用管家**：`apps/windows-desktop/src/main` 再次检查数据、读写数据库、弹出文件选择框，并创建桌面窗口。
+4. **本地账本**：SQLite文件保存分类、收支、预算、模板和设置。关闭App后数据仍在。
 
 ```text
 用户点击保存
-  → React 表单先检查
-  → preload 只传递允许的字段
-  → 主进程用 Zod 再检查
-  → SQLite 事务写入
+  → React表单先检查
+  → preload只传递允许的字段
+  → Electron主进程用Zod再检查
+  → SQLite事务写入
   → 界面重新读取首页、账单和统计
 ```
 
@@ -25,44 +25,35 @@
 - Windows：`%APPDATA%\HeimaAccounting\data\heima-accounting.sqlite3`
 - macOS：`~/Library/Application Support/HeimaAccounting/data/heima-accounting.sqlite3`
 
-SQLite 还可能在数据库旁短暂保留 `-wal` 和 `-shm` 文件，它们是数据库保证安全写入的一部分，不应在 App 运行时单独删除或复制。
+SQLite可能在数据库旁短暂保留 `-wal` 和 `-shm` 文件，它们是安全写入的一部分，不应在App运行时单独删除或复制。
 
 ## 主要模块
 
-- `src/shared`：双方都能理解的数据类型、分类、金额、日期和校验规则。
-- `src/main/database.ts`：建表、迁移、分类初始化、收支查询、退款抵扣、预算、模板、密码锁与统计。
-- `src/main/data-formats.ts`：CSV 导入/导出、备份和稳定校验值。
-- `src/main/portability.ts`：系统文件选择、原子写入、安全备份与恢复。
-- `src/main/ipc.ts`：允许的请求清单和来源验证。
-- `src/renderer/src/components`：导航、记账表单、确认框等可复用界面。
-- `src/renderer/src/pages`：首页、账单、统计、分类管理、数据与设置。
-- `src/renderer/src/components/AnimatedAmount.tsx`：金额从旧值平滑滚动到新值，并响应系统的“减少动画”设置。
-- `src/renderer/src/lib/theme-options.ts`：心情主题名称、色板与快速切换范围的唯一清单。
-- `src/renderer/src/components/MoodThemePicker.tsx`：任意页面可用的心情主题快速切换器。
-- `src/renderer/public/logo-app-v3.png`：AI绘制的白瓷底黑马鎏金应用图标。
-- `src/renderer/public/category-3d-atlas-v2.png`：28格透明背景3D分类图标图集；界面按固定坐标裁切使用。
-- `tests`：纯逻辑、SQLite、React 交互和真实 Electron 操作测试。
+- `apps/windows-desktop/src/shared`：数据类型、分类、金额、日期和校验规则。
+- `apps/windows-desktop/src/main/database.ts`：建表、迁移、分类初始化、收支查询、退款抵扣、预算、模板、密码锁与统计。
+- `apps/windows-desktop/src/main/data-formats.ts`：CSV导入/导出、备份和稳定校验值。
+- `apps/windows-desktop/src/main/portability.ts`：文件选择、原子写入、安全备份与恢复。
+- `apps/windows-desktop/src/main/ipc.ts`：允许的请求清单和来源验证。
+- `apps/windows-desktop/src/renderer/src/components`：导航、记账表单、确认框和主题选择器等可复用界面。
+- `apps/windows-desktop/src/renderer/src/pages`：首页、账单、统计、分类、计划和数据设置页。
+- `apps/windows-desktop/src/renderer/public/logo-app-v3.png`：白底账本、笔与人民币徽章的应用图标。
+- `apps/windows-desktop/src/renderer/public/category-3d-atlas-v2.png`：28格透明背景3D分类图标图集。
+- `apps/windows-desktop/tests`：纯逻辑、SQLite、React交互和真实Electron操作测试。
 
-## 界面与动效结构
+## 界面与动效
 
-- 桌面使用侧边导航；窗口宽度低于860像素时切换为手机式底部导航和悬浮记账按钮。Electron最低窗口为760×640，未来手机端可以继续复用这套窄屏排版。
-- 固定程序图标使用白瓷底、黑马和克制鎏金；分类使用统一光照与材质的3D小物件图集。
-- 心情主题与明暗方式独立保存。黑马经典、暖阳活力、云朵治愈共享功能骨架，但分别改变背景、主色、卡片圆角、阴影和图表舱。
-- `motion` 负责页面进入、弹窗、金额变化、账单删除补位、主题选择器和记账完成反馈；CSS负责按钮、卡片与图标微动效；Recharts负责图表绘制动画。
-- 不使用“旧页必须退出后新页才进入”的串行动画。实际连续切页检查曾出现内容空白，因此改用新页立即进入的可靠方式。
-- `prefers-reduced-motion` 会关闭循环、位移和弹性效果，保证易眩晕用户仍可正常使用。
+- Windows桌面使用侧边导航；窄窗口使用底部导航。这只是桌面响应式布局，不等于Android代码可直接复用。
+- 桌面版保留黑马经典、暖阳活力、云朵治愈和深海专注主题；Android将按新Design System重做四套完整主题。
+- `motion`负责页面、弹窗、金额、列表和主题过渡；CSS负责微动效；Recharts负责图表。
+- `prefers-reduced-motion` 会减少位移和弹性效果，保证易眩晕用户可用。
 
 ## 数据安全策略
 
-- 钱不用小数保存，而是把12.50元保存成1250分，避免计算误差。
-- 每个二级分类必须属于选定的一级分类，并且两级分类都必须匹配收入或支出类型。
-- 数据库迁移第2版为旧账目补上 `expense` 类型，旧支出数据原样保留。
-- 数据库迁移第3版为分类补上颜色；系统分类每次启动同步但保持锁定，自定义分类保存在同一张分类表中并使用独立编号。
-- 数据库迁移第4版为账目加入退款/报销、排除统计和原支出关联，并新增月预算、分类预算与记账模板表。
-- 退款/报销只有关联有效原支出后才可保存；统计时抵扣原支出的金额及分类，普通收入统计不会因此虚高。
-- 隐私密码以随机盐和 `scrypt` 校验值保存，不保存明文。它用于防止旁人随手打开，不是数据库文件加密；拿到电脑文件并具备专业工具的人仍可能读取数据库。
-- 已经被账目引用的自定义分类不会物理删除，只会停用；历史查询仍可通过分类编号读取名称、图标和颜色。
-- 恢复备份时先保存当前账本，整个替换要么全部成功，要么完全不生效。
-- 第4版完整备份包含自定义分类、主题、账目关联、预算和模板；恢复时先验证关系，再按安全顺序写入。第1至第3版旧备份继续兼容。
-- CSV 导入会规范化中文表头、校验每行、跳过重复并在事务导入前创建安全备份。CSV 不适合无损表达退款与原支出的关联，因此这类数据应使用完整备份迁移。
-- 数据库检查失败时保留原文件，等待用户使用备份恢复，不用空数据库覆盖它。
+- 金额以整数“分”保存，12.50元保存为1250分，避免小数误差。
+- 二级分类必须属于选定的一级分类，并匹配收入或支出类型。
+- 退款/报销必须关联有效原支出，统计时抵扣原支出和原分类，不虚增普通收入。
+- 隐私密码保存随机盐和 `scrypt` 校验值，不保存明文；它防随手查看，不等于数据库加密。
+- 有历史账目引用的自定义分类只停用，不物理删除。
+- 恢复备份前先保存当前账本；整个替换要么全部成功，要么完全回滚。
+- CSV不适合无损表达退款与原支出关系，此类数据应用完整备份迁移。
+- 数据库检查失败时保留原文件，不用空数据库覆盖。

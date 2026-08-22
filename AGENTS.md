@@ -10,9 +10,10 @@
 
 ## 项目与产品来源
 
-- 当前工作区根目录就是项目根目录，不得再创建 `HeimaAccounting`、`app`、`project` 等外层包装目录。
+- 当前工作区根目录就是总项目根目录，不得再创建 `HeimaAccounting`、`app`、`project` 等外层包装目录。Windows桌面工程位于 `apps/windows-desktop`，Android工程预留位于 `apps/android`。
 - 项目对外名称为“黑马记账”，内部英文名称为 `HeimaAccounting`。
-- 产品需求以 `docs/PRODUCT.md` 为主要参考；重大技术选择记录在 `docs/TECH_DECISIONS.md`；实际工作和错误维护在 `docs/DEVELOPMENT_LOG.md`。
+- Windows产品需求以 `docs/PRODUCT.md` 为参考，Android产品和设计以 `docs/android/README.md` 所链接的文档为参考；重大技术选择记录在 `docs/TECH_DECISIONS.md`；实际工作和错误维护在 `docs/DEVELOPMENT_LOG.md`。
+- 下一阶段只开发Android，不制作iOS应用；iCost、Apple原生应用和Liquid Glass只用于设计参考。高保真原型未经用户确认前，不开始正式Android业务代码。
 - `docs/DEVELOPMENT_LOG.md` 不得只写版本摘要；每次重要修改需记录需求背景、实现范围、数据兼容、真实失败与根因、修复办法、验证命令与结果、产物和已知限制。不得编造未记录的精确时间或过程。
 - 产品是中国大陆个人用户使用的本地收支记账工具，不得擅自扩展成企业财务系统。
 
@@ -30,14 +31,14 @@
 ## 文件、环境与依赖
 
 - 当前路径包含中文和空格，不得仅因为“可能有问题”迁移项目；只有出现可复现错误时才记录并报告。
-- 大型依赖与缓存优先留在 D 盘；项目通过 `.npmrc` 把 npm 缓存放在根目录 `.cache/npm`。
+- 大型依赖与缓存优先留在 D 盘；Windows工程通过 `apps/windows-desktop/.npmrc` 把 npm 缓存放在该工程的 `.cache/npm`。
 - 优先使用现有环境。新增系统软件、付费服务、账号或证书前必须说明并等待用户批准。
 - 依赖必须由 `package-lock.json` 锁定；升级 Electron 时需同时验证 `better-sqlite3`、electron-vite、electron-builder、端到端测试和安装包。
 - 不提交 `node_modules`、缓存、构建产物、用户数据库、日志或凭据。
 
 ## 完成标准
 
-- 至少运行 `npm run typecheck`、`npm run lint`、`npm test` 和 `npm run build`。
+- Windows工程至少在 `apps/windows-desktop` 中运行 `npm run typecheck`、`npm run lint`、`npm test` 和 `npm run build`。Android正式工程建立后必须另行记录其准确检查命令。
 - 影响主流程时还需运行 `npm run test:e2e`；影响安装或依赖时需运行对应平台打包命令。
 - 更新功能时同步维护 PRODUCT、ARCHITECTURE、BUILD、USER_GUIDE 与 DEVELOPMENT_LOG 中受影响的内容。
 - macOS 构建只能在 Mac 上宣称实际成功；无签名证书时必须明确说明安装包未签名。

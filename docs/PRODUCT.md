@@ -1,4 +1,6 @@
-# 黑马记账产品文档
+# 黑马记账Windows桌面版产品文档
+
+> 本文档保留已经实现的Windows桌面版需求，不代表新Android界面会直接复制桌面布局。Android下一阶段产品规划见 [Android产品定位与范围](android/PRODUCT.md)。
 
 ## 产品定位与用户
 
