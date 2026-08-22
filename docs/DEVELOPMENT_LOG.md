@@ -1139,3 +1139,42 @@ apps/android/构建并检查视觉体验版.cmd
 - Android 12及以上设备可使用真实背景采样；旧系统会使用视觉一致的半透明回退，因此不同手机的模糊强度可能略有差异。
 - 字体商店、正式分类管理、SQLite账目、预算、完整统计、备份与恢复仍属于后续业务阶段；本轮没有用假功能冒充完成。
 - 真机确认0.2.0的核心布局和动效后，再进入正式数据层；如果仍有裁切、字体或厂商启动器图标问题，先按具体机型继续修正视觉，不急于接数据库。
+
+## 2026-08-22：Android Studio与电脑可视化环境配置
+
+### 需求背景
+
+产品负责人认为反复复制APK到手机不便，希望安装Android Studio后直接在电脑上可视化检验，同时继续遵守“大型工具能不放C盘就不放C盘”的固定要求。本次只配置开发与预览环境，没有修改Android业务功能或界面。
+
+### 实施范围
+
+- Android Studio Quail 3 Patch 1安装在 `D:\AndroidDev\AndroidStudio`，旧的C盘程序目录已经卸载。
+- Android SDK、JDK、Gradle缓存、虚拟手机、Android用户目录和Android Studio大型缓存均配置在 `D:\AndroidDev`。
+- 安装Android Emulator 37.1.11和Android 16 Google APIs x86_64系统镜像。
+- 建立Pixel 7规格的虚拟手机 `Heima_Android_16`，分辨率1080×2400、内存2 GB。
+- 新增项目根目录入口 `00-用Android Studio查看手机版.cmd`，双击即可打开正确的Android工程。
+- 保留 `D:\AndroidDev\Downloads\android-studio-quail3-patch1-windows.exe`；删除已完成安装后无用的JDK、Gradle和命令行工具压缩包及校验文件，共释放480,646,018字节（约458 MiB）。
+
+### C盘边界说明
+
+没有把SDK、模拟器镜像、Gradle缓存或Android Studio程序重新放到C盘。Android Studio的config、system、plugins和logs目录都由项目入口指定到D盘。保留 `C:\Users\Administrator\.android` 中的少量ADB密钥、分析设置和调试签名文件，因为删除这些文件可能使手机需要重新授权，或改变调试APK签名。
+
+### 真实失败、根因与修复
+
+1. 旧版 `sdkmanager` 安装1.8 GB系统镜像时长时间没有有效进度，并只留下0字节临时文件。安全停止后删除精确定位的两个临时目录，改用同一Google官方工具包内的新 `android sdk install` 命令，镜像成功下载并完整写入。
+2. 新Android CLI下载显示100%后返回退出码1，但没有输出明确错误。没有按退出码直接假装成功；随后使用旧管理器的已安装列表核对，系统镜像版本7已登记，`system.img`、`vendor.img`、`source.properties`等文件均存在，因此判定下载内容实际完整。这一异常退出如实保留。
+3. `avdmanager` 提示系统镜像目录没有 `devices.xml`，但命令返回成功并生成了完整AVD。随后以 `emulator -list-avds` 独立验证，能够识别 `Heima_Android_16`。
+
+### 验证结果
+
+- 模拟器硬件加速：WHPX可用。
+- 虚拟手机：启动成功，ADB报告 `BOOT_COMPLETED=1`。
+- APK安装：`黑马记账-Android-视觉修正版-0.2.0.apk` 安装成功。
+- 主界面启动：`com.heima.accounting.dev/com.heima.accounting.MainActivity` 成为前台Activity。
+- 目视截图：日期、金额、等高卡片、财务状态、分类洞察和底部记账按钮均正常显示，没有出现启动崩溃或黑屏。
+- 项目一键检查：`:app:assembleDebug`、`:app:testDebugUnitTest`、`:app:lintDebug` 全部通过，95个Gradle任务中1个执行、94个保持最新。
+
+### 当前限制
+
+- Android Studio首次打开仍可能显示Google官方初始化向导；这是用户界面选择，不适合通过命令行盲点。D盘路径与项目入口已经准备好，出现向导时可按项目说明操作。
+- 模拟器能够证明电脑预览流程可用，但不能代替用户实际安卓手机上的启动器图标、厂商字体、触控手感、发热和耗电验收。

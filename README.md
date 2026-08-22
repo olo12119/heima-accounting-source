@@ -9,7 +9,15 @@
 
 ## 你现在怎样打开或安装
 
-当前项目重点是Android。请把下面这个文件复制到安卓手机并安装：
+当前项目重点是Android。现在最适合新手的电脑查看入口是双击：
+
+```text
+00-用Android Studio查看手机版.cmd
+```
+
+它会用安装在 `D:\AndroidDev\AndroidStudio` 的Android Studio直接打开手机工程。D盘中也已经配置好Android SDK、Gradle缓存和名为 `Heima_Android_16` 的虚拟手机。
+
+如果要在自己的安卓手机上查看，请把下面这个文件复制到手机并安装：
 
 ```text
 手机安装包/黑马记账-Android-视觉修正版-0.2.0.apk
