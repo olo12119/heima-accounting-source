@@ -34,11 +34,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
@@ -79,8 +79,8 @@ fun HeimaBottomBar(
                         spring(stiffness = Spring.StiffnessHigh)
                     } else {
                         spring(
-                            dampingRatio = 0.72f,
-                            stiffness = Spring.StiffnessLow,
+                            dampingRatio = 0.90f,
+                            stiffness = Spring.StiffnessMedium,
                         )
                     },
                     label = "bottom_bar_glass_lens",
@@ -145,7 +145,10 @@ private fun BottomBarItem(
     val motion = HeimaTheme.motion
     val color by animateColorAsState(
         targetValue = if (selected) palette.brand else palette.textTertiary,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(
+            dampingRatio = 0.90f,
+            stiffness = Spring.StiffnessMedium,
+        ),
         label = "nav_item_color",
     )
     val selection by animateFloatAsState(
@@ -153,7 +156,7 @@ private fun BottomBarItem(
         animationSpec = if (motion.reduceMotion) {
             spring(stiffness = Spring.StiffnessHigh)
         } else {
-            spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+            spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessMedium)
         },
         label = "nav_item_selection",
     )

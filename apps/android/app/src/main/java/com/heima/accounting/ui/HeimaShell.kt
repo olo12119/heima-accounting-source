@@ -91,18 +91,9 @@ fun HeimaShell(
             ) {
                 AmbientBackdrop()
 
-                AnimatedContent(
-                    targetState = destination,
-                    transitionSpec = {
-                        destinationTransform(
-                            from = initialState,
-                            to = targetState,
-                            reduceMotion = motion.reduceMotion,
-                        )
-                    },
-                    contentKey = { it.name },
-                    label = "primary_navigation",
-                    modifier = Modifier.fillMaxSize(),
+                DestinationPage(
+                    destination = destination,
+                    reduceMotion = motion.reduceMotion,
                 ) { screen ->
                     when (screen) {
                         AppDestination.HOME -> HomeScreen(
@@ -139,7 +130,9 @@ fun HeimaShell(
             HeimaBottomBar(
                 selected = destination,
                 onDestinationSelected = { selected ->
-                    if (selected != AppDestination.RECORD) destination = selected
+                    if (selected != AppDestination.RECORD && selected != destination) {
+                        destination = selected
+                    }
                 },
                 onRecord = { recordPanelVisible = true },
                 recordPanelVisible = recordPanelVisible,
@@ -154,14 +147,14 @@ fun HeimaShell(
                 enter = if (motion.reduceMotion) {
                     fadeIn(tween(90))
                 } else {
-                    fadeIn(tween(150)) +
+                    fadeIn(tween(140)) +
                         slideInVertically(
-                            initialOffsetY = { it / 3 },
+                            initialOffsetY = { it / 7 },
                             animationSpec = spring(
-                                dampingRatio = 0.78f,
-                                stiffness = Spring.StiffnessMediumLow,
+                                dampingRatio = 0.86f,
+                                stiffness = 520f,
                             ),
-                        ) + scaleIn(initialScale = 0.96f)
+                        ) + scaleIn(initialScale = 0.985f)
                 },
                 exit = if (motion.reduceMotion) {
                     fadeOut(tween(70))
@@ -190,6 +183,29 @@ fun HeimaShell(
     }
 }
 
+@Composable
+private fun DestinationPage(
+    destination: AppDestination,
+    reduceMotion: Boolean,
+    content: @Composable (AppDestination) -> Unit,
+) {
+    AnimatedContent(
+        targetState = destination,
+        transitionSpec = {
+            destinationTransform(
+                from = initialState,
+                to = targetState,
+                reduceMotion = reduceMotion,
+            )
+        },
+        contentKey = { it.name },
+        label = "primary_navigation_handoff",
+        modifier = Modifier.fillMaxSize(),
+    ) { screen ->
+        content(screen)
+    }
+}
+
 private fun destinationTransform(
     from: AppDestination,
     to: AppDestination,
@@ -200,18 +216,18 @@ private fun destinationTransform(
     }
     val direction = if (to.ordinal > from.ordinal) 1 else -1
     val movement = spring<IntOffset>(
-        dampingRatio = 0.82f,
-        stiffness = Spring.StiffnessMediumLow,
+        dampingRatio = 0.90f,
+        stiffness = Spring.StiffnessMedium,
     )
     return (
         slideInHorizontally(
-            initialOffsetX = { fullWidth -> direction * fullWidth / 10 },
+            initialOffsetX = { fullWidth -> direction * fullWidth / 18 },
             animationSpec = movement,
-        ) + fadeIn(tween(120))
+        ) + fadeIn(tween(90))
         ) togetherWith (
         slideOutHorizontally(
-            targetOffsetX = { fullWidth -> -direction * fullWidth / 14 },
+            targetOffsetX = { fullWidth -> -direction * fullWidth / 24 },
             animationSpec = movement,
-        ) + fadeOut(tween(100))
+        ) + fadeOut(tween(70))
         )
 }

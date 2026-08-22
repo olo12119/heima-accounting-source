@@ -3,17 +3,14 @@ package com.heima.accounting.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -192,38 +189,13 @@ fun RecordSheet(
                             color = palette.textPrimary,
                             style = MaterialTheme.typography.headlineLarge,
                         )
-                        AnimatedContent(
-                            targetState = formatAmount(amountInput),
-                            transitionSpec = {
-                                if (reduceMotion) {
-                                    EnterTransition.None togetherWith ExitTransition.None
-                                } else {
-                                    (slideInVertically(
-                                        initialOffsetY = { it / 2 },
-                                        animationSpec = spring(
-                                            dampingRatio = 0.78f,
-                                            stiffness = Spring.StiffnessMediumLow,
-                                        ),
-                                    ) + fadeIn()) togetherWith
-                                        (slideOutVertically(
-                                            targetOffsetY = { -it / 2 },
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMedium,
-                                            ),
-                                        ) + fadeOut()) using SizeTransform(clip = false)
-                                }
-                            },
-                            label = "rolling_amount",
-                        ) { amount ->
-                            Text(
-                                text = amount,
-                                color = palette.textPrimary,
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                            )
-                        }
+                        Text(
+                            text = formatAmount(amountInput),
+                            color = palette.textPrimary,
+                            style = MaterialTheme.typography.displayLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
                     }
                     Text(
                         text = "清空",
@@ -335,9 +307,9 @@ private fun IncomeExpenseSwitch(
         val thumbX by animateDpAsState(
             targetValue = targetX,
             animationSpec = if (motion.reduceMotion) {
-                spring(stiffness = Spring.StiffnessHigh)
+                tween(durationMillis = 1)
             } else {
-                spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+                tween(durationMillis = 170, easing = FastOutSlowInEasing)
             },
             label = "income_expense_thumb",
         )
@@ -350,7 +322,8 @@ private fun IncomeExpenseSwitch(
                 .height(40.dp),
             cornerRadius = 16.dp,
             elevation = 7.dp,
-            backdropBlur = true,
+            // 整个面板已经完成一次真实背景采样，滑块只保留玻璃轮廓，避免重复模糊。
+            backdropBlur = false,
         ) {
             Box(
                 Modifier
@@ -379,6 +352,7 @@ private fun IncomeExpenseSwitch(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
+                        .semantics { contentDescription = "切换到${label}" }
                         .clickable(role = Role.Tab) { onChange(expense) },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -573,7 +547,15 @@ private fun KeyButton(
     val palette = HeimaTheme.palette
     PressableGlassSurface(
         onClick = onClick,
-        modifier = modifier.height(52.dp),
+        modifier = modifier
+            .height(52.dp)
+            .semantics {
+                contentDescription = when (text) {
+                    "." -> "输入小数点"
+                    "⌫" -> "删除一位金额"
+                    else -> "输入数字$text"
+                }
+            },
         cornerRadius = 16.dp,
     ) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
@@ -596,7 +578,8 @@ private fun SaveButton(
         onClick = onClick,
         modifier = modifier.height(232.dp),
         cornerRadius = 21.dp,
-        backdropBlur = true,
+        // 父面板负责光学玻璃层；保存按钮只做按压反馈和染色，不再重复模糊。
+        backdropBlur = false,
     ) {
         Box(
             modifier = Modifier
