@@ -16,3 +16,4 @@ Thumbs.db
 *.tsbuildinfo
 .env*
 !.env.example
+/手机安装包/*.apk

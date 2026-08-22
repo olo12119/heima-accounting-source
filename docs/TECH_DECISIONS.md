@@ -6,9 +6,15 @@
 
 正式Android实现推荐 **Kotlin + Jetpack Compose**。Kotlin是Android官方主流开发语言，Compose是现代原生界面工具；对用户来说，它像“按Android的原生规格造房子”，比继续套用Electron更适合手机手势、系统后台、生物识别和不同Android机型。没有选Flutter，是因为已明确不制作iOS，不再需要为一套代码跨两个手机系统付出额外的框架成本。
 
-总项目使用“一个Git存档库、两个独立App”的结构：Windows Electron工程位于 `apps/windows-desktop`，Android原生工程预留在 `apps/android`，设计资产位于 `design/android`，共用备份协议预留在 `shared/contracts`。这样Windows不会污染Android构建，又能让两者共用Git存档和受控的数据迁移规则。
+总项目使用“一个Git存档库、两个独立App”的结构：Windows Electron工程位于 `apps/windows-desktop`，Android原生工程位于 `apps/android`，设计资产位于 `design/android`，共用备份协议预留在 `shared/contracts`。这样Windows不会污染Android构建，又能让两者共用Git存档和受控的数据迁移规则。
 
-为避免过早编码把错误界面固化，阶段顺序固定为：完整UI Design Document → 高保真交互原型 → 用户逐页确认 → Android正式编码。当前只完成第一阶段，没有APK。
+为避免过早编码把错误界面固化，阶段顺序固定为：完整UI Design Document → 高保真交互原型 → 用户逐页确认 → Android正式编码。前三步已经完成，并已交付 `0.1.0-visual` 可安装视觉体验APK；该版本只用于手机检查布局、主题和动效，不含正式数据持久化。
+
+Android工程使用AGP 9.3.1、Gradle Wrapper 9.7.1、Kotlin Compose编译器2.4.10和Compose BOM 2026.08.00。最低Android 10（API 29），目标和编译标准为Android 17（API 37），JDK固定为17。工具链使用项目Wrapper与D盘缓存，不依赖Android Studio或系统PATH。
+
+Liquid Glass不采用全屏实时模糊。当前用绘制缓存、半透明渐变、细边框、高光和短时阴影组合材质；页面切换只使用位移、透明度和缩放。手机省电模式会自动关闭装饰高光，用户也可手动选择省电或减少动效。真实帧率、发热和Batterystats必须等用户手机临时USB调试后测量，电脑编译不能替代。
+
+项目路径保留中文和空格。APK打包可在原路径完成，但Gradle单元测试运行器复用中文绝对路径时无法加载测试类，因此一键脚本临时把同一目录映射为 `H:` 并关闭该次配置缓存。脚本用专用标记验证盘符指向正确项目，结束后删除自己创建的映射；这不是移动或复制工程。
 
 ## 小范围自用的功能取舍
 
