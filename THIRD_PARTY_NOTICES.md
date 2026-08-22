@@ -30,4 +30,4 @@
 
 ## 项目自有素材
 
-`category_3d_atlas.png`、应用图标和 Compose 导航图形来自黑马记账项目此前已经确认或绘制的素材，不标记为上述开源项目的作品。
+`category_3d_atlas_v2.png`、应用图标和 Compose 导航图形来自黑马记账项目此前已经确认或绘制的素材，不标记为上述开源项目的作品。原始分类图集保存在 `apps/android/tools/source-assets`，通过项目内确定性脚本规范化透明边与视觉重心后生成最终资源。

@@ -5,20 +5,22 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +43,7 @@ import com.heima.accounting.designsystem.AmbientBackdrop
 import com.heima.accounting.designsystem.HeimaColorMode
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaThemeStyle
+import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.LocalHeimaBackdrop
 import com.heima.accounting.designsystem.VisualQuality
 import com.heima.accounting.domain.EntryType
@@ -99,6 +102,11 @@ fun HeimaShell(
     } else {
         Modifier
     }
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (recordPanelVisible) .58f else 1f,
+        animationSpec = tween(if (motion.reduceMotion) 60 else 120),
+        label = "modal_background_weight",
+    )
 
     val createDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val content = pendingExport
@@ -141,6 +149,14 @@ fun HeimaShell(
     ProvideCategoryArtwork {
         CompositionLocalProvider(LocalHeimaBackdrop provides backdrop) {
             Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    // Do not run a full-screen RenderEffect while the sheet moves.
+                    // The dim layer and reduced contrast create modal depth without
+                    // forcing every background pixel through another blur pass.
+                    .graphicsLayer { alpha = contentAlpha },
+            ) {
             AmbientBackdrop(Modifier.fillMaxSize().then(backdropRecorder))
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -203,7 +219,23 @@ fun HeimaShell(
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 7.dp),
                 )
             }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (managementPage == null) 92.dp else 14.dp))
+            }
+            SnackbarHost(
+                snackbar,
+                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = if (managementPage == null) 92.dp else 14.dp),
+            ) { data ->
+                GlassSurface(Modifier.fillMaxWidth(), 18.dp, 8.dp, backdropBlur = false) {
+                    androidx.compose.foundation.layout.Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(data.visuals.message, color = HeimaTheme.palette.textPrimary, modifier = Modifier.weight(1f))
+                        data.visuals.actionLabel?.let { label ->
+                            Text(label, color = HeimaTheme.palette.brand, modifier = Modifier.clickable { data.performAction() }.padding(6.dp))
+                        }
+                    }
+                }
+            }
                 if (recordPanelVisible) {
                     RecordSheet(
                         ledgerState.snapshot,
@@ -218,12 +250,13 @@ fun HeimaShell(
     }
 
     restoreCandidate?.let { content ->
-        AlertDialog(
-            onDismissRequest = { restoreCandidate = null },
-            title = { Text("恢复完整账本？") },
-            text = { Text("恢复会替换现有账单、分类和预算。开始前会自动保存当前账本副本，校验失败则不会修改任何数据。") },
-            confirmButton = { TextButton({ restoreCandidate = null; viewModel.restoreBackup(content) }) { Text("确认恢复") } },
-            dismissButton = { TextButton({ restoreCandidate = null }) { Text("取消") } },
+        GlassConfirmDialog(
+            title = "恢复完整账本？",
+            message = "恢复会替换现有账单、分类和预算。开始前会自动保存当前账本副本，校验失败则不会修改任何数据。",
+            confirmText = "确认恢复",
+            onDismiss = { restoreCandidate = null },
+            onConfirm = { restoreCandidate = null; viewModel.restoreBackup(content) },
+            destructive = true,
         )
     }
 }

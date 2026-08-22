@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,13 +25,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.Transaction
-import com.heima.accounting.ui.CategoryArtwork
+import com.heima.accounting.ui.CategoryIcon
+import com.heima.accounting.ui.GlassConfirmDialog
+import com.heima.accounting.ui.GlassTextInputDialog
 import com.heima.accounting.ui.TransactionRow
 import java.time.Instant
 import java.time.ZoneId
@@ -82,26 +82,25 @@ fun RecordsScreen(
         }
     }
     deleting?.let { transaction ->
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text("删除这笔账单？") },
-            text = { Text("删除后可以立即通过底部提示撤销。") },
-            confirmButton = { TextButton({ deleting = null; onDelete(transaction) }) { Text("删除", color = palette.expense) } },
-            dismissButton = { TextButton({ deleting = null }) { Text("取消") } },
+        GlassConfirmDialog(
+            title = "删除这笔账单？",
+            message = "删除后可以立即通过底部提示撤销。",
+            confirmText = "删除",
+            onDismiss = { deleting = null },
+            onConfirm = { deleting = null; onDelete(transaction) },
+            destructive = true,
         )
     }
 }
 
 @Composable
 private fun SegmentedFilter(selected: EntryType?, onSelected: (EntryType?) -> Unit) {
-    val palette = HeimaTheme.palette
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(null to "全部", EntryType.EXPENSE to "支出", EntryType.INCOME to "收入").forEach { (value, label) ->
-            PressableGlassSurface({ onSelected(value) }, Modifier.weight(1f).height(43.dp), 15.dp, backdropBlur = selected == value) {
-                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { Text(label, color = if (selected == value) palette.brand else palette.textSecondary) }
-            }
-        }
-    }
+    GlassSegmentedControl(
+        options = listOf<Pair<EntryType?, String>>(null to "全部", EntryType.EXPENSE to "支出", EntryType.INCOME to "收入"),
+        selected = selected,
+        onSelected = onSelected,
+        accessibilityLabel = "账单类型筛选",
+    )
 }
 
 @Composable
@@ -133,7 +132,7 @@ fun CategoriesScreen(
             GlassSurface(Modifier.fillMaxWidth(), 23.dp, backdropBlur = false) {
                 Column(Modifier.padding(17.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CategoryArtwork(category.iconKey, Modifier.size(48.dp))
+                        CategoryIcon(category.iconKey, selected = false, size = 48.dp)
                         Spacer(Modifier.size(11.dp))
                         Column(Modifier.weight(1f)) {
                             Text(category.name, color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
@@ -170,33 +169,27 @@ fun CategoriesScreen(
         }
     }
     deleting?.let { category ->
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text("删除“${category.name}”？") },
-            text = {
-                Text(
-                    "没有账单使用时会直接删除；已有账单使用时只会从可选列表中停用，历史账单不会丢失。",
-                )
-            },
-            confirmButton = {
-                TextButton({ deleting = null; onDelete(category) }) {
-                    Text("确认删除", color = palette.expense)
-                }
-            },
-            dismissButton = { TextButton({ deleting = null }) { Text("取消") } },
+        GlassConfirmDialog(
+            title = "删除“${category.name}”？",
+            message = "没有账单使用时会直接删除；已有账单使用时只会从可选列表中停用，历史账单不会丢失。",
+            confirmText = "确认删除",
+            onDismiss = { deleting = null },
+            onConfirm = { deleting = null; onDelete(category) },
+            destructive = true,
         )
     }
 }
 
 @Composable
 private fun CategoryDialog(initial: String, title: String, onResult: (String?) -> Unit) {
-    var value by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = { onResult(null) },
-        title = { Text(title) },
-        text = { OutlinedTextField(value, { value = it.take(20) }, singleLine = true) },
-        confirmButton = { TextButton({ if (value.isNotBlank()) onResult(value.trim()) }) { Text("保存") } },
-        dismissButton = { TextButton({ onResult(null) }) { Text("取消") } },
+    GlassTextInputDialog(
+        title = title,
+        initialValue = initial,
+        placeholder = "请输入名称",
+        confirmText = "保存",
+        validator = { value -> if (value.isBlank()) "请输入名称" else null },
+        onDismiss = { onResult(null) },
+        onConfirm = { value -> onResult(value.trim().take(20)) },
     )
 }
 

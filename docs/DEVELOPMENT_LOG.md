@@ -1301,3 +1301,66 @@ lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-
 - 最终报告：`FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`THIRD_PARTY_NOTICES.md`。
 - 真机电量、温度、Thermal 和不同厂商 120Hz 表现为 `NOT TESTED`；模拟器不冒充真机。
 - 本地签名密钥和手机账目不由 Git 保护，分别需要安全复制和 App 内完整备份。
+
+## 2026-08-23：Android 1.0.1 发布前 UI/UX 与逻辑定型
+
+### 需求背景
+
+正式版发布前逐屏复查发现：分类图标的视觉重量和透明边缘不统一，日期与备注不像同一套控件，快速记账仍调用系统英文日期选择器，统计范围缺少连续反馈，首页记账入口不够突出，财务状态缺少可验证依据，部分设置开关可能产生“视觉状态、实际状态、持久化状态”不一致，记账弹层背景存在玻璃叠玻璃造成的发白与文字穿透，收入/支出切换还可能错误展开二级分类。本轮不是只修截图，而是把这些问题下沉到共享组件、业务规则与自动化测试中统一修正。
+
+### 实现范围
+
+1. 新建共享 `CategoryIcon`，统一 64dp 容器、视觉安全区、裁剪、阴影、Glass/Fallback 与选中态。分类图集改为透明背景规范化后的 `category_3d_atlas_v2.png`；首页、记账、分类管理和分类排行统一使用同一组件。
+2. 新增可重复执行的图集规范化工具 `tools/CategoryAtlasNormalizer.cs` 与 `normalize-category-atlas.ps1`，从保留的源图集裁去多余边缘、去除错误透明像素并输出确定性资源；前后两次生成的 SHA-256 一致。
+3. 在 Design System 中新增 `GlassSegmentedControl`、`GlassToggle`、`GlassChip`、`GlassFieldSurface` 与 `GlassModalScrim`，统一控制开启/关闭 Glass、深色模式、降级材质、圆角、边框、选中态和减少动态效果。
+4. 快速记账的日期和备注改为同高 54dp 控件；系统 DatePicker 被中文 `LiquidGlassDatePicker` 替代，支持周一开头、月份切换、今天标记、选中 Lens、取消与确定，并保持 Light/Dark 与 Glass On/Off 一致。
+5. 重写快速记账分类状态机：切换收入/支出时清空不相干状态且不自动展开；只有用户本次点击一级分类后才展示二级 Chip；二级分类始终可选，一级分类可直接保存；未选择任何分类时给出明确提示。
+6. 底栏继续使用一整块连续玻璃和单一滑动 Lens，中间“记账”通过轻微放大、Accent Tint、Highlight 与按压回弹提高优先级，不再叠加巨大悬浮球。
+7. 统计范围改为滑动 Segmented Lens，数据计算移到 `Dispatchers.Default`，筛选与图表使用轻量内容过渡，并遵守“减少动态效果”。
+8. 新建 `FinancialInsightRules`，阈值集中在领域层。财务状态只使用真实账单、收入、支出、预算、历史均值和分类变化；数据不足时不评价，有数据时说明产生结论的原因。删除旧的凭少量字段直接给状态的方法。
+9. 全部设置开关改用同一 `GlassToggle`：开启=右侧且使用强调色，关闭=左侧且为灰色。Liquid Glass、操作音效、触觉反馈、减少动态效果和金额隐私均加入方向、功能及重启持久化测试。
+10. 模态层级改为“背景降权 + 单一 Dim + 主 Sheet 材质 + 内部轻量 Surface”。最终移除快速记账场景的全屏实时 RenderEffect Blur，避免 Glass-on-Glass、文字穿透和重复 GPU 采样。
+11. App 内确认框、文本输入框和日期选择器统一为自有 Glass 组件；普通交互不再出现旧式系统 Dialog。系统权限窗口仍由 Android 管理。
+12. 版本提升为 1.0.1（101），重新生成、对齐、签名并验证最终 APK；旧 APK 统一移入“旧版本-请勿安装”。
+
+### 数据兼容
+
+- 没有删除、清空或重建用户数据库，也没有改变金额以整数“分”保存的规则。
+- 本轮没有需要迁移的数据表结构变更；原有账单、预算、分类和设置可以继续读取。
+- 新的财务洞察会自动排除已排除/软删除账单，且空数据不会生成虚假评价。
+- 正式 APK 使用与 1.0.0 相同的项目签名，可直接覆盖安装；覆盖安装不会主动删除账本。
+
+### 真实失败、根因与修复
+
+1. 图像生成候选图带有烘焙进像素的棋盘格，不是真透明背景。没有把它包装成正式资源；改用项目已有源图并建立确定性透明边缘处理流程。
+2. 规范化脚本首次直接运行被 PowerShell 本机执行策略阻止。仅对该次进程使用 `-ExecutionPolicy Bypass`，未改变电脑的永久安全策略；随后重复生成验证哈希一致。
+3. 首次完整 UI 测试有 2 项失败，原因不是业务错误，而是背景和弹层同时暴露“餐饮/工资”文字导致测试定位歧义。给共享分类控件增加准确的无障碍语义后，第二次仍有“午餐”歧义，再把二级分类也统一加入角色与描述；最终 21 项全部通过。
+4. 发布签名首次因为当前构建进程没有 `JAVA_HOME` 而失败。只在该进程临时指定 D 盘 JDK 后成功，没有修改系统 PATH。
+5. 正式冒烟脚本首次误用了 PowerShell 保留变量 `$PID`，导致进程过滤结果不可信。改用独立变量 `$appProcessId` 后重新安装、冷启动并检查，应用进程保持运行且日志窗口内没有 App FATAL/ANR。
+6. 本轮性能采样时模拟器持续出现“System UI isn't responding”，GPU 百分位被固定为不可能的 4950ms；重启虚拟设备后仍复现。该数据明确标记为无效，没有把它写成 App 性能结论，也没有用“肉眼流畅”代替测试。
+
+### 验证命令与结果
+
+```text
+:app:lintRelease :core:domain:test :core:data:test :core:database:test :app:testDebugUnitTest --no-daemon
+:app:connectedDebugAndroidTest --no-daemon
+:app:assembleRelease --no-daemon
+```
+
+- Release Lint：通过，0 issue。
+- JVM 单元/集成测试：23 项通过，0 失败、0 错误、0 跳过。
+- 模拟器 UI/交互测试：21 项通过，0 失败、0 跳过。
+- 覆盖流程包括金额自然输入、无分类提示、一级快速保存、二级精细保存、收入/支出状态清理、自定义中文日期选择、四种统计范围、全部设置开关方向与持久化、隐私状态和页面导航。
+- 视觉回归实际检查首页、统计、快速记账、日期、二级分类、我的与设置，并覆盖 Light/Dark、Liquid Glass On/Off；最终记账弹层没有背景文字穿透。
+- Release 构建通过，R8 和资源收缩完成；APK 经 zipalign 与 APK Signature Scheme v3 验证。
+- 正式 APK 覆盖安装到 Android 16 模拟器成功；系统识别版本为 101，包名为 `com.heima.accounting`。
+- 真实手机的耗电、发热、厂商 GPU 与触控手感仍为 `NOT TESTED`；模拟器异常性能数据不冒充真机结果。
+
+### 交付物与已知限制
+
+- 唯一推荐正式安装包：`手机安装包/黑马记账-Android-正式版-1.0.1.apk`。
+- 文件大小：4,747,122 字节。
+- SHA-256：`d70c691ec974f490e9fad4d491c103a1526a166daedd2be05f584225bef93e77`。
+- 最终报告同步更新为 `FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
+- 1.0.0 和更早 APK 已移入 `手机安装包/旧版本-请勿安装`；它们仅用于历史对照。
+- Git 保护源码和文档，不保护用户手机中的账单、正式签名密钥或未纳入 Git 的 APK；账单需使用 App 内备份，密钥需另行安全复制。

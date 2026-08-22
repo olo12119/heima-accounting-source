@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,10 +59,15 @@ fun SensitiveAmountText(
     prefix: String = "",
     signed: Boolean = false,
 ) {
+    val reduceMotion = HeimaTheme.motion.reduceMotion
     AnimatedContent(
         targetState = visible,
         transitionSpec = {
-            fadeIn(tween(110, delayMillis = 80)) togetherWith fadeOut(tween(90))
+            if (reduceMotion) {
+                fadeIn(tween(55)) togetherWith fadeOut(tween(45))
+            } else {
+                fadeIn(tween(110, delayMillis = 70)) togetherWith fadeOut(tween(90))
+            }
         },
         label = "private_amount",
         modifier = modifier,
@@ -204,14 +207,7 @@ fun TransactionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(Color(primary?.colorArgb ?: 0xFF8A96A8).copy(alpha = 0.13f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            CategoryArtwork(primary?.iconKey ?: "other", Modifier.size(43.dp))
-        }
+        CategoryIcon(primary?.iconKey ?: "other", selected = false, size = 48.dp)
         Column(Modifier.weight(1f)) {
             Text(
                 secondary?.name ?: primary?.name ?: "未分类",

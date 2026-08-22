@@ -34,12 +34,14 @@ import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.FinanceRules
+import com.heima.accounting.domain.FinancialInsightLevel
+import com.heima.accounting.domain.FinancialInsightRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.formatYuan
 import com.heima.accounting.ui.AnimatedBudgetGauge
 import com.heima.accounting.ui.AnimatedTrendChart
-import com.heima.accounting.ui.CategoryArtwork
+import com.heima.accounting.ui.CategoryIcon
 import com.heima.accounting.ui.SensitiveAmountText
 import com.heima.accounting.ui.TransactionRow
 import java.time.LocalDate
@@ -69,7 +71,15 @@ fun HomeScreen(
     val budget = snapshot.budgets.firstOrNull { it.month == FinanceRules.monthKey(today) }
     val remainingBudget = budget?.let { (it.amountCents - monthSummary.expenseCents).coerceAtLeast(0L) }
     val recent = snapshot.transactions.take(6)
-    val health = FinanceRules.financialHealth(monthSummary, budget?.amountCents)
+    val insight = remember(snapshot.transactions, snapshot.budgets, snapshot.categories, today) {
+        FinancialInsightRules.evaluate(snapshot, today)
+    }
+    val insightColor = when (insight.level) {
+        FinancialInsightLevel.INSUFFICIENT -> palette.brand
+        FinancialInsightLevel.STABLE -> palette.income
+        FinancialInsightLevel.ATTENTION -> palette.warning
+        FinancialInsightLevel.HIGH_PRESSURE -> palette.expense
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -140,12 +150,12 @@ fun HomeScreen(
                     Column(Modifier.weight(1f)) {
                         Text("财务状态", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(4.dp))
-                        Text(health, color = palette.brand, style = MaterialTheme.typography.headlineMedium)
-                        Text(if (snapshot.transactions.isEmpty()) "记下第一笔后，这里会给出温和提示" else "根据本月收支与预算给出的本地提示", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                        Text(insight.title, color = insightColor, style = MaterialTheme.typography.headlineMedium)
+                        Text(insight.explanation, color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
                     }
                     Canvas(Modifier.size(74.dp)) {
-                        drawCircle(palette.brandSoft.copy(alpha = 0.72f))
-                        drawCircle(palette.brand, radius = size.minDimension * 0.30f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
+                        drawCircle(insightColor.copy(alpha = 0.16f))
+                        drawCircle(insightColor, radius = size.minDimension * 0.30f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
                     }
                 }
             }
@@ -161,7 +171,7 @@ fun HomeScreen(
                         val category = snapshot.category(total.categoryId)
                         GlassSurface(Modifier.size(width = 132.dp, height = 142.dp), cornerRadius = 24.dp, backdropBlur = false) {
                             Column(Modifier.padding(15.dp)) {
-                                CategoryArtwork(category?.iconKey ?: "other", Modifier.size(52.dp))
+                                CategoryIcon(category?.iconKey ?: "other", selected = false, size = 54.dp)
                                 Spacer(Modifier.height(3.dp))
                                 Text(category?.name ?: "未分类", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
                                 SensitiveAmountText(total.amountCents, amountsVisible, MaterialTheme.typography.labelLarge, palette.textSecondary)

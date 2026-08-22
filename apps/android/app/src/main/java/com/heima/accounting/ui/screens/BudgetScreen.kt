@@ -11,11 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +29,7 @@ import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.ui.AnimatedBudgetGauge
+import com.heima.accounting.ui.GlassTextInputDialog
 import com.heima.accounting.ui.SensitiveAmountText
 import java.time.LocalDate
 
@@ -91,7 +89,12 @@ fun BudgetScreen(snapshot: LedgerSnapshot, amountsVisible: Boolean, onSaveBudget
         item {
             GlassSurface(Modifier.fillMaxWidth(), 22.dp, backdropBlur = false) {
                 Text(
-                    if (budget == null) "设置一个适合自己的月预算即可；黑马记账不会用频繁提醒制造焦虑。" else if (ratio >= .85f) "本月预算已接近上限，接下来的支出可以稍加留意。" else "当前消费节奏平稳，保持适合自己的生活方式。",
+                    when {
+                        budget == null -> "设置预算后，这里会用真实支出计算使用比例。"
+                        ratio > 1f -> "本月预算使用率为 ${(ratio * 100).toInt()}%，已超过设定额度。"
+                        ratio >= .85f -> "本月预算使用率为 ${(ratio * 100).toInt()}%，已接近设定额度。"
+                        else -> "本月预算使用率为 ${(ratio * 100).toInt().coerceAtLeast(0)}%，结果来自当前真实账单。"
+                    },
                     Modifier.padding(20.dp), color = palette.textSecondary,
                 )
             }
@@ -111,18 +114,15 @@ private fun BudgetMetric(label: String, amount: Long, visible: Boolean) {
 
 @Composable
 private fun BudgetDialog(current: Long?, onResult: (Long?) -> Unit) {
-    var input by remember { mutableStateOf(current?.let { (it / 100).toString() }.orEmpty()) }
-    var error by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = { onResult(null) },
-        title = { Text("本月预算") },
-        text = {
-            Column {
-                OutlinedTextField(input, { input = it.filter { character -> character.isDigit() || character == '.' }.take(12); error = false }, label = { Text("金额（元）") }, singleLine = true)
-                if (error) Text("请输入大于 0 的金额", color = MaterialTheme.colorScheme.error)
-            }
+    GlassTextInputDialog(
+        title = "本月预算",
+        initialValue = current?.let { (it / 100).toString() }.orEmpty(),
+        placeholder = "金额（元）",
+        confirmText = "保存",
+        validator = { input ->
+            if (FinanceRules.parseYuanToCents(input) == null || FinanceRules.parseYuanToCents(input)!! <= 0L) "请输入大于 0 的金额" else null
         },
-        confirmButton = { TextButton({ val cents = FinanceRules.parseYuanToCents(input); if (cents != null && cents > 0) onResult(cents) else error = true }) { Text("保存") } },
-        dismissButton = { TextButton({ onResult(null) }) { Text("取消") } },
+        onDismiss = { onResult(null) },
+        onConfirm = { input -> onResult(FinanceRules.parseYuanToCents(input)) },
     )
 }

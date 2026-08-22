@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -76,7 +78,7 @@ fun HeimaBottomBar(
     LaunchedEffect(lensTarget) {
         lensPosition.animateTo(
             lensTarget.ordinal.toFloat(),
-            if (motion.reduceMotion) spring(stiffness = Spring.StiffnessHigh) else spring(
+            if (motion.reduceMotion) tween(70) else spring(
                 dampingRatio = 0.88f,
                 stiffness = 430f,
             ),
@@ -93,7 +95,7 @@ fun HeimaBottomBar(
             val slotWidth = maxWidth / AppDestination.entries.size
             val lensWidth = slotWidth - 8.dp
             val x = slotWidth * lensPosition.value + (slotWidth - lensWidth) / 2
-            val velocityStretch = min(abs(lensPosition.velocity) * 0.025f, 0.13f)
+            val velocityStretch = if (motion.reduceMotion) 0f else min(abs(lensPosition.velocity) * 0.025f, 0.13f)
             val baseLens = Modifier
                 .offset { IntOffset(x.roundToPx(), 8.dp.roundToPx()) }
                 .width(lensWidth)
@@ -164,29 +166,54 @@ private fun BottomBarItem(
     modifier: Modifier = Modifier,
 ) {
     val palette = HeimaTheme.palette
-    val feedbackSpec = if (destination == AppDestination.RECORD) tween<Color>(120) else spring(dampingRatio = 0.9f, stiffness = 500f)
+    val motion = HeimaTheme.motion
+    val primary = destination == AppDestination.RECORD
+    val feedbackSpec = if (motion.reduceMotion || primary) tween<Color>(90) else spring(dampingRatio = 0.9f, stiffness = 500f)
     val color by animateColorAsState(
-        if (selected) palette.brand else palette.textTertiary,
+        if (selected || primary) palette.brand else palette.textTertiary,
         feedbackSpec,
         label = "navigation_color",
     )
     val selection by animateFloatAsState(
         if (selected) 1f else 0f,
-        if (destination == AppDestination.RECORD) tween(120) else spring(dampingRatio = 0.88f, stiffness = 500f),
+        if (motion.reduceMotion || primary) tween(90) else spring(dampingRatio = 0.88f, stiffness = 500f),
         label = "navigation_selection",
     )
     val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && !motion.reduceMotion) .94f else 1f,
+        animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .82f, stiffness = 700f),
+        label = "primary_navigation_press",
+    )
     Column(
         modifier = modifier
             .height(76.dp)
             .semantics { contentDescription = destination.accessibilityLabel }
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .clickable(source, indication = null, role = Role.Tab, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(if (destination == AppDestination.RECORD) 30.dp else 23.dp)
+                .size(if (primary) 38.dp else 23.dp)
+                .then(
+                    if (primary) {
+                        Modifier
+                            .clip(RoundedCornerShape(15.dp))
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        palette.glassHighlight.copy(alpha = if (motion.darkTheme) .14f else .62f),
+                                        palette.brandSoft.copy(alpha = if (motion.darkTheme) .62f else .90f),
+                                    ),
+                                ),
+                            )
+                            .border(1.dp, palette.brand.copy(alpha = .40f), RoundedCornerShape(15.dp))
+                            .padding(6.dp)
+                    } else Modifier
+                )
                 .graphicsLayer {
                     scaleX = lerp(1f, 1.08f, selection)
                     scaleY = lerp(1f, 1.08f, selection)
@@ -200,7 +227,7 @@ private fun BottomBarItem(
             destination.label,
             color = color,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            fontWeight = if (selected || primary) FontWeight.SemiBold else FontWeight.Medium,
         )
     }
 }

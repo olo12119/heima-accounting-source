@@ -2,9 +2,9 @@
 
 ## 当前结论
 
-Android 原生正式版 `1.0.0` 已完成。iCost、Apple 原生应用、visionOS 和 Liquid Glass 只作为信息布局、材质与动效参考；项目没有制作 iOS 应用。
+Android 原生正式版 `1.0.1` 已完成。iCost、Apple 原生应用、visionOS 和 Liquid Glass 只作为信息布局、材质与动效参考；项目没有制作 iOS 应用。
 
-当前技术为 Kotlin + Jetpack Compose + SQLite，默认人民币、本地优先、无需账号。正式 APK 位于 `../../手机安装包/黑马记账-Android-正式版-1.0.0.apk`。
+当前技术为 Kotlin + Jetpack Compose + SQLite，默认人民币、本地优先、无需账号。正式 APK 位于 `../../手机安装包/黑马记账-Android-正式版-1.0.1.apk`。
 
 ## 阅读顺序
 

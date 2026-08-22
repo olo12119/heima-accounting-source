@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.R
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.GlassSegmentedControl
+import com.heima.accounting.designsystem.GlassToggle
 import com.heima.accounting.designsystem.HeimaColorMode
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaThemeStyle
@@ -114,7 +114,7 @@ fun ProfileScreen(
                 }
             }
         }
-        item { Text("黑马记账 1.0.0", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
+        item { Text("黑马记账 1.0.1", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
     }
 }
 
@@ -130,14 +130,7 @@ private fun ThemeSwatch(name: String, colors: List<Color>, selected: Boolean, on
 
 @Composable
 private fun <T> SegmentedOptions(options: List<Pair<T, String>>, selected: T, onSelected: (T) -> Unit) {
-    val palette = HeimaTheme.palette
-    Row(Modifier.fillMaxWidth().background(palette.surfaceMuted.copy(.68f), RoundedCornerShape(17.dp)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        options.forEach { (value, label) ->
-            Box(Modifier.weight(1f).background(if (selected == value) palette.brandSoft else Color.Transparent, RoundedCornerShape(13.dp)).clickable { onSelected(value) }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(label, color = if (selected == value) palette.brand else palette.textSecondary, style = MaterialTheme.typography.labelMedium)
-            }
-        }
-    }
+    GlassSegmentedControl(options, selected, onSelected, accessibilityLabel = "设置选项")
 }
 
 @Composable
@@ -145,10 +138,10 @@ private fun SettingToggle(title: String, subtitle: String, checked: Boolean, onC
     val palette = HeimaTheme.palette
     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) { Text(title, color = palette.textPrimary, style = MaterialTheme.typography.titleMedium); Text(subtitle, color = palette.textSecondary, style = MaterialTheme.typography.bodySmall) }
-        Switch(
+        GlassToggle(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            modifier = Modifier.semantics { contentDescription = "$title 开关" },
+            contentDescription = "$title 开关",
         )
     }
 }

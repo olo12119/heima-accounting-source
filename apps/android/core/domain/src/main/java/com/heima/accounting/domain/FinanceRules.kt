@@ -75,13 +75,6 @@ object FinanceRules {
 
     fun monthKey(date: LocalDate): String = "%04d-%02d".format(date.year, date.monthValue)
 
-    fun financialHealth(summary: FinanceSummary, budgetCents: Long?): String = when {
-        summary.expenseCents == 0L && summary.incomeCents == 0L -> "等待记录"
-        budgetCents != null && budgetCents > 0L && summary.expenseCents > budgetCents -> "已经超支"
-        budgetCents != null && budgetCents > 0L && summary.expenseCents >= budgetCents * 85 / 100 -> "接近预算"
-        summary.balanceCents < 0L -> "需要留意"
-        else -> "平稳"
-    }
 }
 
 fun Long.formatYuan(showSymbol: Boolean = true): String {

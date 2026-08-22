@@ -1,6 +1,6 @@
 # 黑马记账架构说明
 
-> Android 1.0.0 的正式结构为 `app + core:designsystem + core:domain + core:data + core:database`，详细结论见 [最终发布报告](../FINAL_RELEASE_REPORT.md)。Windows Electron 工程位于 `apps/windows-desktop`；下文继续解释独立的桌面版架构。
+> Android 1.0.1 的正式结构为 `app + core:designsystem + core:domain + core:data + core:database`，详细结论见 [最终发布报告](../FINAL_RELEASE_REPORT.md)。Windows Electron 工程位于 `apps/windows-desktop`；下文继续解释独立的桌面版架构。
 
 ## 用普通话解释App的组成
 
