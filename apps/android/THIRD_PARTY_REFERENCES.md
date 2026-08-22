@@ -1,19 +1,24 @@
-# 第三方动效与玻璃效果调研记录
+# Android Liquid Glass 研究与最终使用记录
 
-本文件记录0.3性能与动效阶段参考的开源项目。当前源码没有复制以下两个项目的源文件，也没有把它们作为运行依赖打包；它们用于理解玻璃层级、参数缓存和性能边界。
+## 最终运行依赖
 
-## AndroidLiquidGlass
+### Kyant0/AndroidLiquidGlass
 
-- 项目：https://github.com/Kyant0/AndroidLiquidGlass
-- 许可证：Apache-2.0（以原仓库当前许可证文件为准）
-- 借鉴点：共享背景采样层、玻璃效果集中管理、选中镜片与内容分层、避免每个小控件各自重复采样。
-- 实测结论：把Backdrop实验与多项转场改动同时加入后的候选版，在本项目虚拟设备上未达到性能门槛，因此没有保留为正式依赖。
+- 仓库：https://github.com/Kyant0/AndroidLiquidGlass
+- 固定研究提交：`b18eb0ff12c616546a68c72e7d0097f1ab286c87`
+- 最终依赖：`io.github.kyant0:backdrop:2.0.0`
+- 许可证：Apache-2.0
+- 实际用途：Backdrop、Lens、Blur、Vibrancy、Highlight、Shadow、InnerShadow。
+- 重点阅读：README、LiquidButton、LiquidToggle、LiquidSlider、LiquidBottomTabs、Backdrop、lens/blur/vibrancy/highlight/shadow 和拖动/Spring 实现。
 
-## AndroidLiquidGlassView
+## 仅研究，未复制或链接
 
-- 项目：https://github.com/QmDeve/AndroidLiquidGlassView
-- 许可证：MIT（以原仓库当前许可证文件为准）
-- 借鉴点：参数不变化时复用模糊结果、只在必要时更新着色器、低系统版本提供稳定回退。
-- 实测结论：项目继续使用已存在并验证稳定的Haze局部采样，同时采用“有限区域、缓存绘制、节能降级”的思路，没有复制该仓库代码。
+### QmDeve/AndroidLiquidGlassView
 
-如下一阶段决定直接复制代码或新增依赖，必须重新检查对应版本、许可证、NOTICE要求和设备性能，不能把本文件当成永久授权判断。
+- 仓库：https://github.com/QmDeve/AndroidLiquidGlassView
+- 固定研究提交：`3c7b2d046726afdc9263b56cb8224e029ff1f924`
+- 许可证：MIT
+- 重点阅读：README、core、LiquidGlassView、Config、TouchEffectActivity、ElasticLiquidGlassViewActivity、Draggable、Blur/Tint/Refraction/Dispersion Shader 和背景绑定。
+- 最终状态：没有复制源文件、没有 Gradle 依赖；只吸收参数分层、缓存和兼容降级思路。
+
+正式第三方通知位于根目录 `THIRD_PARTY_NOTICES.md`，完整 Apache 许可证位于 `licenses/AndroidLiquidGlass-APACHE-2.0.txt`。

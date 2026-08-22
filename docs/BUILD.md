@@ -1,11 +1,13 @@
 # 黑马记账构建说明
 
+> Android 1.0.0 已完成，普通用户安装 `手机安装包/黑马记账-Android-正式版-1.0.0.apk`；Android Studio 和完整测试命令见 [Android 构建与测试](android/BUILD_AND_TEST.md)。下文保留 Windows 1.5.0 独立产品线的构建说明。
+
 ## 先分清两个项目
 
 - Windows桌面版的完整Electron工程在 `apps/windows-desktop`。
-- Android手机版当前只有设计文档，还没有Gradle工程、源码或APK，因此没有Android构建命令。
+- Android 手机版正式工程位于 `apps/android`，已经有 Gradle 工程、源码、测试和正式 APK。
 
-下面的命令全部只针对Windows桌面版。
+下面其余命令只针对 Windows 桌面版。
 
 ## 当前验证环境
 

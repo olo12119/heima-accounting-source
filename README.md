@@ -1,59 +1,48 @@
 # 黑马记账
 
-黑马记账现在是一个包含两条产品线的项目：
+黑马记账现在包含两条彼此独立的产品线：
 
-- **Windows桌面版**：1.5.0免安装预览版，已实现完整收支记账功能，仍然可正常打开。
-- **Android手机版**：当前源码为 `0.3.0-performance-motion` 性能与动效基础版，通过Android Studio虚拟手机查看；本轮按用户要求不生成独立交付APK。
+- Android 正式版 `1.0.0`：本项目当前重点，已完成本地收支、分类、预算、统计、备份恢复、主题和 Liquid Glass。
+- Windows 桌面版 `1.5.0`：保留在 `apps/windows-desktop`，没有被 Android 工程覆盖。
 
-两者已经分开放置，不会把Windows的Electron文件混入Android原生工程。iCost、Apple原生应用和Liquid Glass只是设计参考，黑马记账下一阶段只开发Android，不制作iOS应用。
+iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项目当前只发布 Android App，不制作 iOS 版本。
 
-## 你现在怎样打开或安装
+## 普通用户唯一推荐入口
 
-当前项目重点是Android。现在最适合新手的电脑查看入口是双击：
+把这个文件复制到安卓手机并点击安装：
+
+```text
+手机安装包\黑马记账-Android-正式版-1.0.0.apk
+```
+
+这是已经签名的正式安装文件，代表当前最终源码。`手机安装包\旧版本-请勿安装` 中的 0.1 和 0.2 仅用于历史对比。
+
+如果想在电脑模拟器查看当前源码，双击：
 
 ```text
 00-用Android Studio查看手机版.cmd
 ```
 
-它会用安装在 `D:\AndroidDev\AndroidStudio` 的Android Studio直接打开手机工程。D盘中也已经配置好Android SDK、Gradle缓存和名为 `Heima_Android_16` 的虚拟手机。
-
-点击顶部设备列表选择 `Heima_Android_16`，再点击绿色三角形即可看到当前0.3源码。`手机安装包` 中的0.2.0 APK仍保留用于历史对比，但它不是当前代码，也不要用它验收本轮成果。
-
-如需打开旧的Windows桌面版，请在项目根目录双击：
-
-```text
-00-打开Windows桌面版-1.5.0.cmd
-```
-
-它会打开1.5.0免安装预览版。旧的 `00-点我打开黑马记账-当前最新版.cmd` 仍然保留为兼容入口。Windows版和Android版是两条独立产品线，不要把Windows的EXE复制到手机。
+等待同步结束，顶部选择 `Heima_Android_16`，点击绿色三角形。Android Studio 运行的是源码开发版；APK 是给手机直接安装的正式版，两者功能代码相同，但签名和用途不同。
 
 ## 项目地图
 
 ```text
 黑马记账app/
-├─ apps/
-│  ├─ windows-desktop/   已完成的Windows桌面版源码、测试和预览成品
-│  └─ android/           Android原生源码、测试和构建脚本
-├─ design/android/         Android高保真原型和视觉稿
-├─ docs/android/           Android UI/UX、动效、主题和技术方案
-├─ docs/                   通用及Windows桌面版文档
-├─ 手机安装包/             历史Android APK；当前0.3没有独立交付APK
-└─ shared/contracts/       未来两端备份格式的共用说明
+├─ apps/android/              Android 原生源码与测试
+├─ apps/windows-desktop/      旧 Windows 产品线
+├─ docs/android/              Android 产品、设计、构建文档
+├─ 手机安装包/                当前正式 APK 与归档旧版
+├─ FINAL_RELEASE_REPORT.md    最终功能和架构
+├─ TEST_REPORT.md             功能、异常和自动测试
+├─ PERFORMANCE_REPORT.md      模拟器性能与真机边界
+└─ THIRD_PARTY_NOTICES.md     开源项目和许可证
 ```
 
-更详细的小白说明见 [请先看这里](00-请先看这里.md) 和 [项目文件地图](docs/FILE_GUIDE.md)。
+## 技术结构
 
-## Windows开发检查
-
-所有Windows命令现在都需要先进入它的独立目录：
-
-```powershell
-Set-Location ".\apps\windows-desktop"
-npm.cmd run dev
-```
-
-类型检查、代码规范、38项自动测试、Electron端到端测试、生产构建和免安装版冒烟测试已在目录分离后全部通过。完整命令见 [构建说明](docs/BUILD.md)。
+Android 使用 Kotlin + Jetpack Compose + SQLite。账目金额以整数“分”保存；数据库、导出与恢复在数据层完成，页面不能直接绕过校验修改数据库。Liquid Glass 使用 Kyant Backdrop，并对旧系统、省电模式和用户关闭效果提供一致回退。
 
 ## Git“游戏存档”
 
-双击 `00-查看Git存档点.cmd` 可以只读查看存档，不会修改文件。请注意：Git保护的是源码和文档，不会自动保护你在软件中记录的个人账目。
+双击 `00-查看Git存档点.cmd` 可以只读查看源码存档。Git 不会自动备份手机中的账目、APK 和本地签名密钥：账目请用 App 内“完整备份”，签名密钥请另行备份 `apps/android/.local-signing`。

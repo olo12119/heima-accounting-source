@@ -1233,3 +1233,71 @@ apps/android/构建并检查视觉体验版.cmd
 - Android Studio内部会生成可重新构建的 `app-debug.apk`，但没有复制进 `手机安装包`，也没有作为用户成品交付。
 - 当前唯一推荐入口是根目录 `00-用Android Studio查看手机版.cmd`；选择 `Heima_Android_16` 后点击绿色三角形。
 - 模拟器帧数据不能代替用户真实安卓手机的温度、电量、启动器图标和触控手感；正式发布前仍需真机测试。
+
+## 2026-08-23：Android 1.0.0 最终正式定型
+
+### 需求背景
+
+产品负责人要求把已经能运行的 Android 视觉版整体定型为可长期使用的本地账本，不再局部修补。范围包含两个指定 Liquid Glass 仓库的深入研究、统一材质系统、连续底栏 Lens、可拖动快速记账、完整两级分类、真实 SQLite 数据、预算/统计、深色模式、音效/触觉、隐私、性能测试、正式签名 APK 和四份最终报告。
+
+### 项目审计
+
+正式修改前检查了 Gradle/Kotlin/Compose 版本、页面、主题、动画、资源、分类、预算、统计、设置、深色、音效、隐私、Glass 实现和项目文档。保留 `apps/android` 现有工程，没有新建割裂项目；Windows 版没有删除。数据库从无正式持久化的视觉骨架扩展为模块化本地数据层，金额规则继续使用整数分。
+
+### Liquid Glass 研究与许可证
+
+- 阅读 `QmDeve/AndroidLiquidGlassView` 的 README、core、LiquidGlassView、Config、Touch、Elastic、Draggable、Blur/Tint/Refraction/Dispersion Shader 和背景绑定，固定研究提交 `3c7b2d046726afdc9263b56cb8224e029ff1f924`。最终没有复制代码或加入依赖。
+- 阅读 `Kyant0/AndroidLiquidGlass` 的 README、LiquidButton、LiquidToggle、LiquidSlider、LiquidBottomTabs、Backdrop、lens/blur/vibrancy/highlight/shadow 和 Drag/Spring，固定研究提交 `b18eb0ff12c616546a68c72e7d0097f1ab286c87`。
+- 最终引入 `io.github.kyant0:backdrop:2.0.0`，保留 Apache-2.0 完整许可证、Copyright 和根目录第三方通知。
+
+### 实现范围
+
+1. 建立 `core:domain`、`core:database`、`core:data` 和 `core:designsystem`，页面、业务规则、数据库和材质分离。
+2. SQLite 启用外键、WAL、索引、迁移版本和 quick_check；数据库异常进入保护界面，不自动删除原文件。
+3. 补齐支出与收入一级/二级分类、自定义分类、账单 CRUD、删除撤销、预算、真实首页/统计、CSV 和完整备份恢复。
+4. 备份加入版本、时间与 SHA-256；恢复前生成安全副本，在一个事务中替换数据。
+5. 底栏改为连续 Glass Bar 和单一滑动 Lens；页面只组合当前目的地，避免多个图表页面同时存活。
+6. 快速记账使用自然人民币输入、完整一级分类、可选二级分类、日期、备注、真实 Drag Handle 和速度/距离关闭。
+7. 主题只保留澄澈蓝与自然治愈；加入 Light/Dark/System、Liquid Glass、音效、触觉、减少动效和视觉质量。
+8. 3D 分类图集从项目既有素材接入，并改为全 App 单次解码；应用图标保留白底并增加安全内缩。
+9. 删除开发版 UI 文案、过期视觉版构建脚本、debug.log 和重复交付入口；旧 APK 移到“旧版本-请勿安装”。
+10. 版本定为 1.0.0（100），Release 开启 R8 和资源收缩，并用项目专用密钥签名。
+
+### 真实失败、根因和修复
+
+1. Gradle 缓存锁在受限执行环境中拒绝访问。根因是工具链按用户要求位于工作区外的 `D:\AndroidDev`；使用已授权的 D 盘构建权限继续，没有移动工程或修改系统 PATH。
+2. 初版 Backdrop 把包含 Glass 控件的根层再次作为自身采样源，出现原生 SIGSEGV。改为只录制稳定的 AmbientBackdrop，消除递归采样。
+3. 初版 Haze/Backdrop 候选出现重复白色矩形与多层过度采样。最终统一使用 Kyant Backdrop，并把真实采样限制在必要表面。
+4. 备份恢复测试触发分类自关联外键错误。根因是删除父分类早于子分类；修复删除顺序后，错误恢复仍能完整回滚。
+5. 单元测试最初把金额 0 的解析与保存校验混为一谈。规则实际允许精确解析 0，但 Repository 拒绝保存非正数；修正测试边界，没有篡改产品规则。
+6. 隐私测试最初只查找一个隐藏金额，页面实际正确隐藏多处。测试改为验证整个敏感金额集合。
+7. Android Lint 发现错误导入、旧资源、动画状态读取、PrimitiveState、空 super 调用和资源读取不随 Configuration 更新。逐项修复，未建立 Baseline 或关闭规则。
+8. 3D 图集曾被每个分类图标各自解码。增加 App 级单实例资源缓存，降低打开记账面板的解码与内存突发。
+9. 快速记账使用大面积实时 Blur 和长 Spring 时，模拟器压力数据很差。最终关闭大型 Sheet 的逐帧 Backdrop、轻量化数字键、暂停被遮挡底栏、缩短入场为 32dp/90ms；Drag 回位仍使用 Spring。
+10. 第一次 APK 验签因当前进程没有 JAVA_HOME 失败。只在该进程指定 D 盘 JDK 后重新验签成功，没有修改系统环境。
+11. 最终门禁重跑时，模拟器先后拒绝安装新的 Debug App 与自动测试工具包，错误均为 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。根因是模拟器残留的 `com.heima.accounting.dev` 和 `com.heima.accounting.dev.test` 使用另一把调试签名密钥；这不是代码或测试断言失败。先把旧开发包的 SQLite 数据库和偏好原样备份到被 Git 忽略的 `.tmp/emulator-data-backup`，验证 SQLite 文件头正确后，再卸载旧开发包与不含账本数据的旧测试工具包，最后重新执行完整门禁。
+
+### 最终验证
+
+最终质量门禁：
+
+```text
+lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-daemon
+```
+
+- 严格 Lint：通过。
+- JVM 单元测试：19 项通过，0 失败、0 错误、0 跳过。
+- 模拟器集成/UI：14 项通过，0 失败、0 跳过。
+- Release 构建：通过，R8 和资源收缩完成。
+- 数据规模：100、1000、10000 条事务替换与读回通过。
+- 正式 APK：zipalign、APK Signature Scheme v3 验签和模拟器覆盖安装通过。
+- 最终 APK 为 5,238,642 字节，SHA-256 为 `1b5362f3f2a08d89e989c40a838b7b44c62ebe2ff2741d6de2ef39e9aab6ce4d`；覆盖安装后的最终冷启动观测为 1506 ms。
+- Tab 压力：Glass 开 2.78% 现代 Jank，关 0.68%；首页滚动 Glass 开 0.37%。
+- 快速记账复杂 Sheet 在模拟器上的入场帧仍高于目标，已在性能报告标记为需真机验证，没有伪造“完全流畅”。
+
+### 交付与限制
+
+- 正式 APK：`手机安装包/黑马记账-Android-正式版-1.0.0.apk`。
+- 最终报告：`FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`THIRD_PARTY_NOTICES.md`。
+- 真机电量、温度、Thermal 和不同厂商 120Hz 表现为 `NOT TESTED`；模拟器不冒充真机。
+- 本地签名密钥和手机账目不由 Git 保护，分别需要安全复制和 App 内完整备份。

@@ -1,6 +1,6 @@
-# 黑马记账Windows桌面版架构说明
+# 黑马记账架构说明
 
-> Windows Electron工程已整体位于 `apps/windows-desktop`。本文档解释已实现的桌面版；Android原生App的规划见 [Android技术与数据方案](android/TECH_AND_DATA_PLAN.md)。
+> Android 1.0.0 的正式结构为 `app + core:designsystem + core:domain + core:data + core:database`，详细结论见 [最终发布报告](../FINAL_RELEASE_REPORT.md)。Windows Electron 工程位于 `apps/windows-desktop`；下文继续解释独立的桌面版架构。
 
 ## 用普通话解释App的组成
 

@@ -1,72 +1,57 @@
-# Android Studio运行、构建与测试说明
+# Android 正式版运行、构建与测试
 
-## 普通用户唯一推荐入口
+## 新手查看界面
 
-1. 在项目根目录双击 `00-用Android Studio查看手机版.cmd`。
-2. 等待Android Studio底部的同步和索引结束；第一次可能需要几分钟。
-3. 顶部设备列表选择 `Heima_Android_16`。
-4. 点击绿色三角形“运行”。虚拟手机会自动安装并打开当前源码。
-5. 检查结束后，点击顶部红色方块停止App；再关闭虚拟手机或Android Studio。
+1. 双击项目根目录 `00-用Android Studio查看手机版.cmd`。
+2. 等待同步完成，选择 `Heima_Android_16`。
+3. 点击绿色三角形。
+4. 检查完点击红色方块停止 App。
 
-当前源码版本是 `0.3.0-performance-motion`。本轮按产品负责人要求不复制独立APK，因此 `手机安装包` 中的0.2.0只是历史对照，不能代表当前代码。
+## 手机安装
 
-## 容易混淆的版本
-
-| 名称 | 当前状态 | 是否代表当前代码 |
-| --- | --- | --- |
-| Android Studio源码运行 `0.3.0-performance-motion` | 当前推荐 | 是 |
-| 历史APK `0.2.0-visual` | 保留用于对比 | 否 |
-| 历史APK `0.1.0-visual` | 保留用于对比 | 否 |
-| 正式发布APK/AAB | 尚未制作 | 否 |
-| Windows免安装版 `1.5.0` | 独立产品线 | 否 |
-
-## 不复制APK的检查入口
-
-开发者运行：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\apps\android\scripts\verify-studio.ps1"
-```
-
-它使用D盘JDK、SDK与Gradle缓存，并执行：
+当前唯一正式文件：
 
 ```text
-:app:assembleDebug
-:app:testDebugUnitTest
-:app:lintDebug
+手机安装包\黑马记账-Android-正式版-1.0.0.apk
 ```
 
-Gradle在 `apps/android/app/build` 内生成内部调试文件是Android Studio运行所必需的，但脚本不会把APK复制到 `手机安装包`，也不会把它当作用户交付成品。
+它和 Android Studio 调试运行的区别：APK 用项目专用发布密钥签名，适合手机长期安装；Android Studio 运行的是 `.dev` 调试包，适合电脑开发检查。
 
-虚拟手机界面测试：
+## D 盘工具链
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\apps\android\scripts\verify-studio.ps1" -Tasks ":app:connectedDebugAndroidTest"
+$env:JAVA_HOME='D:\AndroidDev\Jdk\jdk-17.0.20.1+1'
+$env:ANDROID_HOME='D:\AndroidDev\Sdk'
+$env:GRADLE_USER_HOME='D:\AndroidDev\GradleCache'
+Set-Location '.\apps\android'
 ```
 
-页签性能回归：
+这些变量只作用于当前命令窗口，不修改系统 PATH。
+
+## 最终质量门禁
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\apps\android\scripts\measure-tab-performance.ps1" -PauseMilliseconds 300
+.\gradlew.bat lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-daemon
 ```
 
-性能脚本固定使用1080×2400的 `Heima_Android_16`，每300毫秒切换一次，共32次；它会先强制停止旧任务、从首页启动并清空旧帧统计，避免把打开的记账面板或上一次数据混入结果。
+- `lintDebug`：检查 Android/Compose 错误和性能隐患。
+- `testDebugUnitTest`：金额、日期、分类、CSV 等 19 项 JVM 测试。
+- `connectedDebugAndroidTest`：在已启动的模拟器执行 14 项数据库和 UI 测试。
+- `assembleRelease`：生成 R8 压缩的未签名 Release 中间产物。
 
-## 0.3阶段验证标准
+最终签名使用忽略 Git 的 `.local-signing/heima-release.jks`。密钥丢失后无法给现有用户做覆盖升级，因此必须单独备份。
 
-- Kotlin/Compose编译通过。
-- 金额单元测试覆盖直接元输入、小数点、最多两位小数和整数分转换。
-- 严格Android Lint零错误，不建立基线隐藏问题。
-- 虚拟手机界面测试覆盖四个真实页面、`12.50`原样显示、收入/支出切换和对应常用分类。
-- 32次页签性能记录帧分位数、GPU分位数、慢UI线程、慢绘制与截止帧超时。
-- 目视检查首页和记账面板：中央按钮不被系统手势条遮挡，选中镜片不盖住图标，记账键盘不留下大块无用空白。
+## 性能回归
 
-## 性能与耗电边界
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\measure-tab-performance.ps1" -PackageName "com.heima.accounting" -Cycles 12 -PauseMilliseconds 180
+```
 
-- Liquid Glass只在底栏、重点卡片和记账面板等有限区域使用，不做全屏持续模糊。
-- 页面使用短距离、高阻尼Spring交接；不用整页普通淡入叠加。
-- 金额输入立即更新，不使用逐位滚动动画。
-- 系统省电模式自动关闭昂贵模糊并提高表面不透明度。
-- 没有无限动画、后台服务、网络轮询或定时任务。
+脚本固定针对 1080×2400 的项目模拟器。模拟器可以发现卡顿趋势，但不能代替真机电池、温度和厂商 GPU 验收。
 
-模拟器能发现布局和明显帧问题，但不能等同于用户安卓手机的温度、电量和厂商系统表现；正式发布前仍需真机验收。
+## 报告位置
+
+- Lint：`app/build/reports/lint-results-debug.html`
+- 单元测试：各模块 `build/reports/tests/testDebugUnitTest/index.html`
+- 模拟器测试：`app/build/reports/androidTests/connected/debug/index.html`
+- 正式总报告：根目录 `FINAL_RELEASE_REPORT.md`

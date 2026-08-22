@@ -109,3 +109,15 @@ Liquid Glass不是主题名称，也不采用全屏实时模糊。`0.2.0-visual`
 ## 6. 打包
 
 使用 electron-builder 26：Windows 生成 x64 NSIS 安装包、便携版和解压目录；macOS 配置 DMG/ZIP，并需在 Mac 上分别构建 arm64/x64。当前没有购买签名证书，也不使用开发者账号，因此产物未签名；这不会影响功能，但系统可能显示安全警告。
+
+## Android 1.0 最终技术决策
+
+- 最终采用 Kotlin + Jetpack Compose，不制作 iOS，也不继续用 Electron 充当手机 App。
+- Android 数据层采用平台 SQLiteOpenHelper，而不是早期规划中的 Room；理由是当前模型小、迁移与事务边界清楚，能够减少额外代码生成，同时仍保留外键、WAL、索引、quick_check 和版本迁移。
+- 设置与账目统一通过 Repository 暴露；轻量偏好使用 Android 本地偏好保存。UI 不直接操作数据库。
+- Liquid Glass 最终运行依赖为 Kyant Backdrop 2.0.0，Apache-2.0。Haze 仅属于 0.2/0.3 历史试验，不在 1.0 最终依赖中。
+- `QmDeve/AndroidLiquidGlassView` 只用于研究 Refraction、Dispersion、Touch、Elastic 和缓存，没有复制或链接其代码。
+- 实时 Backdrop 只用于底栏和少量重点表面；大型快速记账 Sheet 使用统一兼容材质，防止全屏 Blur 在拖动中反复计算。
+- 连续底栏共用一块 Lens；点击“记账”属于打开模态面板，不切换页面目的地。面板打开后暂停被完全遮挡的底栏绘制。
+- 金额隐私、Liquid Glass、音效、触觉和减少动效彼此独立并永久保存。声音关闭不影响触觉。
+- Release 版本为 1.0.0（100），最低 Android 10。APK 用本地项目专用 RSA 4096 密钥签名；密钥不进 Git，必须另行备份。

@@ -1,35 +1,32 @@
-# 黑马记账 Android App
+# 黑马记账 Android 1.0.0
 
-## 当前状态
+这是与 Windows 桌面版分开的 Android 原生正式工程。
 
-这里是与Windows桌面版完全分开的Android原生工程。当前源码版本为 `0.3.0-performance-motion`，本轮专门打磨底部导航、记账面板、Liquid Glass材质和性能。
+## 技术栈
 
-当前版本可以在Android 10及以上手机安装并体验：
+- Kotlin、Jetpack Compose、Material 3
+- 模块化 `app / core:designsystem / core:domain / core:data / core:database`
+- Android SQLiteOpenHelper、WAL、外键、索引、事务和迁移版本
+- Kyant Backdrop 2.0.0 Liquid Glass
+- AndroidX 测试、Compose UI Test、严格 Android Lint、R8
 
-- 首页、统计、记账、预算、我的五项底部导航。
-- “澄澈蓝”和“自然治愈”两套主题；Liquid Glass是两套主题共用的高级材质效果，不是主题名称。
-- 真实局部背景模糊（支持的设备）、玻璃高光与折射边缘、按压回弹、短距离页面交接和记账面板展开。
-- 系统省电模式自动降低装饰效果，另有手动省电和减少动效选项。
-- 带滑动动效的收入/支出切换、常用一级分类和可直接输入小数点的人民币金额键盘。
-- 缩小主体留白后的白底自适应图标、重新绘制的中央记账笔图标和不会被底栏裁切的独立记账按钮。
-- 首页当前公历日期、星期、农历、每日问候、金额隐私开关，以及等高的趋势/预算卡片。
+## 功能
 
-当前版本明确还没有接入正式数据库，记账、预算、分类管理、备份等入口中的内容不会持久保存。界面会如实提示“视觉体验版”，不生成虚假账目。
+- 收入与支出、自然小数金额、一级快速分类、可选二级精细分类。
+- 完整默认分类和用户自定义分类。
+- 首页、统计、预算、账单、分类、数据管理和设置。
+- CSV、带 SHA-256 的完整 JSON 备份和事务恢复。
+- 两套主题、Light/Dark/System、Liquid Glass、音效、触觉、隐私金额。
+- 无虚假账单、无网络权限、无后台服务。
 
-## 唯一推荐体验入口
+## 打开与构建
 
-在项目根目录双击：
+普通用户安装根目录 `手机安装包/黑马记账-Android-正式版-1.0.0.apk`。
 
-`../../00-用Android Studio查看手机版.cmd`
+开发者从根目录双击 `00-用Android Studio查看手机版.cmd`，或按 `../../docs/android/BUILD_AND_TEST.md` 使用 D 盘工具链构建。
 
-等待项目同步完成，在顶部选择 `Heima_Android_16`，点击绿色三角形运行。关闭时先点顶部红色方块停止App，再关闭虚拟手机或Android Studio。本轮按要求没有把0.3复制成独立APK；`手机安装包` 里的0.2.0不是当前版本。
+## 重要边界
 
-## 工程边界
-
-- Android源码在本目录。
-- Windows桌面版仍在 `../windows-desktop`，没有被删除或覆盖。
-- Android设计与技术文档在 `../../docs/android`。
-- 高保真确认图在 `../../design/android`。
-- 大型依赖和缓存位于 `D:\AndroidDev`，没有修改Windows系统PATH。
-
-开发者构建和测试方式见 `../../docs/android/BUILD_AND_TEST.md`。
+- 本地签名密钥位于忽略 Git 的 `.local-signing`，必须单独备份。
+- APK、构建目录、Gradle 缓存、模拟器和用户数据库不进入 Git。
+- 模拟器不能代表真机耗电和温度；真实性能边界见 `../../PERFORMANCE_REPORT.md`。

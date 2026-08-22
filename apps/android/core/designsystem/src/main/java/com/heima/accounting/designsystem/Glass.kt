@@ -1,5 +1,6 @@
 package com.heima.accounting.designsystem
 
+import android.os.Build
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -31,11 +32,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
 
-val LocalHeimaHazeState: ProvidableCompositionLocal<HazeState?> =
+val LocalHeimaBackdrop: ProvidableCompositionLocal<Backdrop?> =
     staticCompositionLocalOf { null }
 
 @Composable
@@ -48,9 +54,10 @@ fun GlassSurface(
 ) {
     val palette = HeimaTheme.palette
     val quality = HeimaTheme.motion.quality
-    val hazeState = LocalHeimaHazeState.current
+    val material = HeimaTheme.motion
+    val backdrop = LocalHeimaBackdrop.current
     val shape = RoundedCornerShape(cornerRadius)
-    val blurEnabled = backdropBlur && hazeState != null && quality != VisualQuality.POWER_SAVER
+    val blurEnabled = backdropBlur && backdrop != null && material.expensiveGlassEnabled && Build.VERSION.SDK_INT >= 33
     val surfaceAlpha = when (quality) {
         VisualQuality.REFINED -> if (blurEnabled) 0.24f else 0.78f
         VisualQuality.AUTO -> if (blurEnabled) 0.32f else 0.84f
@@ -58,18 +65,52 @@ fun GlassSurface(
     }
 
     val opticalModifier = if (blurEnabled) {
-        Modifier.hazeEffect(state = hazeState) {
-            blurRadius = if (quality == VisualQuality.REFINED) 28.dp else 22.dp
-            backgroundColor = palette.surface.copy(alpha = 0.20f)
-            tints = listOf(
-                HazeTint(palette.glassTop.copy(alpha = 0.20f)),
-                HazeTint(palette.glassBottom.copy(alpha = 0.16f)),
-            )
-            fallbackTint = HazeTint(palette.surface.copy(alpha = 0.90f))
-            noiseFactor = if (quality == VisualQuality.REFINED) 0.045f else 0.025f
-        }
+        Modifier.drawBackdrop(
+            backdrop = requireNotNull(backdrop),
+            shape = { shape },
+            effects = {
+                vibrancy()
+                blur(if (quality == VisualQuality.REFINED) 12.dp.toPx() else 8.dp.toPx())
+                lens(
+                    refractionHeight = if (quality == VisualQuality.REFINED) 4.dp.toPx() else 2.dp.toPx(),
+                    refractionAmount = if (quality == VisualQuality.REFINED) 5.dp.toPx() else 3.dp.toPx(),
+                    chromaticAberration = false,
+                )
+            },
+            highlight = { Highlight.Default.copy(alpha = if (material.darkTheme) .16f else .34f) },
+            shadow = { Shadow(alpha = if (material.darkTheme) .14f else .28f) },
+            innerShadow = { InnerShadow(radius = 5.dp, alpha = if (material.darkTheme) .10f else .20f) },
+            onDrawSurface = {
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = if (material.darkTheme) {
+                            listOf(
+                                palette.surface.copy(alpha = .34f),
+                                palette.brandSoft.copy(alpha = .18f),
+                                palette.surface.copy(alpha = .24f),
+                            )
+                        } else {
+                            listOf(
+                                palette.surface.copy(alpha = .22f),
+                                palette.brandSoft.copy(alpha = .16f),
+                                palette.surface.copy(alpha = .14f),
+                            )
+                        },
+                        start = Offset.Zero,
+                        end = Offset(size.width, size.height),
+                    ),
+                )
+            },
+        )
     } else {
-        Modifier
+        Modifier.background(
+            brush = Brush.verticalGradient(
+                listOf(
+                    palette.glassTop.copy(alpha = surfaceAlpha),
+                    palette.glassBottom.copy(alpha = surfaceAlpha * .82f),
+                ),
+            ),
+        )
     }
 
     Box(
@@ -82,21 +123,13 @@ fun GlassSurface(
             )
             .clip(shape)
             .then(opticalModifier)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        palette.glassTop.copy(alpha = surfaceAlpha),
-                        palette.glassBottom.copy(alpha = surfaceAlpha * 0.82f),
-                    ),
-                ),
-            )
-            .border(BorderStroke(1.dp, palette.glassStroke.copy(alpha = 0.88f)), shape)
+            .border(BorderStroke(1.dp, palette.glassStroke.copy(alpha = if (material.darkTheme) 0.40f else 0.88f)), shape)
             .drawWithCache {
                 val radiusPx = cornerRadius.toPx()
                 val rim = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.86f),
-                        palette.glassHighlight.copy(alpha = 0.40f),
+                        Color.White.copy(alpha = if (material.darkTheme) 0.13f else 0.72f),
+                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.11f else 0.36f),
                         palette.brand.copy(alpha = 0.14f),
                         Color.Transparent,
                     ),
@@ -105,26 +138,35 @@ fun GlassSurface(
                 )
                 val sheen = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = if (quality == VisualQuality.POWER_SAVER) 0.12f else 0.42f),
+                        Color.White.copy(
+                            alpha = when {
+                                !material.liquidGlassEnabled -> 0.05f
+                                material.darkTheme -> 0.055f
+                                quality == VisualQuality.POWER_SAVER -> 0.12f
+                                else -> 0.32f
+                            },
+                        ),
                         Color.Transparent,
                     ),
                     center = Offset(size.width * 0.20f, size.height * 0.02f),
                     radius = size.maxDimension * 0.82f,
                 )
                 onDrawWithContent {
-                    drawContent()
+                    // The sheen belongs behind text and icons. Drawing it above the content
+                    // was the root cause of washed-out labels in the old dark theme.
                     drawRoundRect(
                         brush = sheen,
                         cornerRadius = CornerRadius(radiusPx, radiusPx),
                     )
-                    if (quality != VisualQuality.POWER_SAVER) {
+                    drawContent()
+                    if (material.expensiveGlassEnabled) {
                         drawRoundRect(
                             brush = rim,
                             cornerRadius = CornerRadius(radiusPx, radiusPx),
                             style = Stroke(width = 1.4.dp.toPx()),
                         )
                         drawLine(
-                            color = Color.White.copy(alpha = 0.48f),
+                            color = Color.White.copy(alpha = if (material.darkTheme) 0.09f else 0.38f),
                             start = Offset(radiusPx * 0.72f, 1.4.dp.toPx()),
                             end = Offset(size.width - radiusPx * 0.72f, 1.4.dp.toPx()),
                             strokeWidth = 1.2.dp.toPx(),
@@ -171,6 +213,7 @@ fun PressableGlassSurface(
                 ),
             ),
         cornerRadius = cornerRadius,
+        elevation = if (backdropBlur) 14.dp else 5.dp,
         backdropBlur = backdropBlur,
         content = content,
     )
@@ -188,7 +231,8 @@ private fun Modifier.noRippleClick(
 @Composable
 fun AmbientBackdrop(modifier: Modifier = Modifier) {
     val palette = HeimaTheme.palette
-    val decorationsEnabled = HeimaTheme.motion.decorationsEnabled
+    val material = HeimaTheme.motion
+    val decorationsEnabled = material.decorationsEnabled
 
     Box(
         modifier = modifier
@@ -217,7 +261,12 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                palette.ambientOne.copy(alpha = if (decorationsEnabled) 0.62f else 0.24f),
+                                palette.ambientOne.copy(alpha = when {
+                                    material.darkTheme && decorationsEnabled -> 0.24f
+                                    decorationsEnabled -> 0.62f
+                                    material.darkTheme -> 0.12f
+                                    else -> 0.24f
+                                }),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * 0.86f, size.height * 0.04f),
@@ -229,7 +278,12 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                palette.ambientTwo.copy(alpha = if (decorationsEnabled) 0.42f else 0.18f),
+                                palette.ambientTwo.copy(alpha = when {
+                                    material.darkTheme && decorationsEnabled -> 0.18f
+                                    decorationsEnabled -> 0.42f
+                                    material.darkTheme -> 0.10f
+                                    else -> 0.18f
+                                }),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * 0.04f, size.height * 0.72f),
@@ -241,7 +295,12 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                palette.brandSoft.copy(alpha = if (decorationsEnabled) 0.32f else 0.12f),
+                                palette.brandSoft.copy(alpha = when {
+                                    material.darkTheme && decorationsEnabled -> 0.15f
+                                    decorationsEnabled -> 0.32f
+                                    material.darkTheme -> 0.08f
+                                    else -> 0.12f
+                                }),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * 0.78f, size.height * 0.60f),
@@ -254,7 +313,7 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                         drawPath(
                             path = ribbon,
                             brush = Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color.White.copy(alpha = 0.25f), Color.Transparent),
+                                listOf(Color.Transparent, Color.White.copy(alpha = if (material.darkTheme) 0.07f else 0.25f), Color.Transparent),
                             ),
                             style = Stroke(width = 22.dp.toPx()),
                         )

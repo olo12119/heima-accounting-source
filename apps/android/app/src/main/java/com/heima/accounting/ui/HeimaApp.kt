@@ -9,11 +9,15 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.edit
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.heima.accounting.HeimaViewModel
 import com.heima.accounting.designsystem.HeimaAccountingTheme
 import com.heima.accounting.designsystem.HeimaColorMode
 import com.heima.accounting.designsystem.HeimaThemeStyle
@@ -22,6 +26,8 @@ import com.heima.accounting.designsystem.VisualQuality
 @Composable
 fun HeimaApp() {
     val context = LocalContext.current
+    val viewModel: HeimaViewModel = viewModel()
+    val ledgerState by viewModel.ledgerState.collectAsStateWithLifecycle()
     val preferences = remember(context) {
         context.getSharedPreferences("heima_visual_preferences", Context.MODE_PRIVATE)
     }
@@ -55,7 +61,17 @@ fun HeimaApp() {
     var amountsVisible by remember {
         mutableStateOf(preferences.getBoolean("amounts_visible", true))
     }
+    var liquidGlassEnabled by remember {
+        mutableStateOf(preferences.getBoolean("liquid_glass_enabled", true))
+    }
+    var soundEnabled by remember {
+        mutableStateOf(preferences.getBoolean("sound_enabled", true))
+    }
+    var hapticEnabled by remember {
+        mutableStateOf(preferences.getBoolean("haptic_enabled", true))
+    }
     val powerSaveMode = rememberPowerSaveMode()
+    val thermalStatus = rememberThermalStatus()
     val systemDark = isSystemInDarkTheme()
     val darkTheme = when (colorMode) {
         HeimaColorMode.SYSTEM -> systemDark
@@ -63,23 +79,35 @@ fun HeimaApp() {
         HeimaColorMode.DARK -> true
     }
     val effectiveQuality = when {
-        quality == VisualQuality.AUTO && powerSaveMode -> VisualQuality.POWER_SAVER
+        quality == VisualQuality.AUTO && (powerSaveMode || thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) ->
+            VisualQuality.POWER_SAVER
         else -> quality
     }
+    val feedback = rememberInteractionFeedback(
+        soundEnabled = { soundEnabled },
+        hapticEnabled = { hapticEnabled },
+    )
 
     HeimaAccountingTheme(
         style = themeStyle,
         darkTheme = darkTheme,
         quality = effectiveQuality,
         reduceMotion = reduceMotion,
+        liquidGlassEnabled = liquidGlassEnabled,
     ) {
         HeimaShell(
+            viewModel = viewModel,
+            ledgerState = ledgerState,
+            feedback = feedback,
             themeStyle = themeStyle,
             colorMode = colorMode,
             visualQuality = quality,
             reduceMotion = reduceMotion,
             powerSaveMode = powerSaveMode,
             amountsVisible = amountsVisible,
+            liquidGlassEnabled = liquidGlassEnabled,
+            soundEnabled = soundEnabled,
+            hapticEnabled = hapticEnabled,
             onThemeStyleChange = {
                 themeStyle = it
                 preferences.edit { putString("theme_style", it.name) }
@@ -100,8 +128,35 @@ fun HeimaApp() {
                 amountsVisible = it
                 preferences.edit { putBoolean("amounts_visible", it) }
             },
+            onLiquidGlassEnabledChange = {
+                liquidGlassEnabled = it
+                preferences.edit { putBoolean("liquid_glass_enabled", it) }
+            },
+            onSoundEnabledChange = {
+                soundEnabled = it
+                preferences.edit { putBoolean("sound_enabled", it) }
+            },
+            onHapticEnabledChange = {
+                hapticEnabled = it
+                preferences.edit { putBoolean("haptic_enabled", it) }
+            },
         )
     }
+}
+
+@Composable
+private fun rememberThermalStatus(): Int {
+    val context = LocalContext.current
+    val powerManager = remember(context) {
+        context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+    var status by remember { mutableIntStateOf(powerManager.currentThermalStatus) }
+    DisposableEffect(powerManager) {
+        val listener = PowerManager.OnThermalStatusChangedListener { status = it }
+        powerManager.addThermalStatusListener(listener)
+        onDispose { powerManager.removeThermalStatusListener(listener) }
+    }
+    return status
 }
 
 private inline fun <reified T : Enum<T>> enumPreference(value: String?, fallback: T): T =

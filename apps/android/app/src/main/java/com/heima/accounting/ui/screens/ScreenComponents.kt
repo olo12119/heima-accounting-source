@@ -1,6 +1,7 @@
 package com.heima.accounting.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +60,7 @@ internal fun ScreenHeading(
 internal fun SectionHeading(
     title: String,
     action: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -76,6 +78,9 @@ internal fun SectionHeading(
                 text = action,
                 style = MaterialTheme.typography.labelLarge,
                 color = HeimaTheme.palette.brand,
+                modifier = Modifier
+                    .clickable(enabled = onAction != null) { onAction?.invoke() }
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
             )
         }
     }
@@ -132,4 +137,3 @@ internal fun EmptyIllustration(
         )
     }
 }
-

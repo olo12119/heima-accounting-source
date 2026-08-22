@@ -2,14 +2,6 @@ package com.heima.accounting.ui.screens
 
 import android.icu.util.Calendar
 import android.icu.util.ULocale
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,10 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +33,15 @@ import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
+import com.heima.accounting.domain.FinanceRules
+import com.heima.accounting.domain.LedgerSnapshot
+import com.heima.accounting.domain.StatisticsPeriod
+import com.heima.accounting.domain.formatYuan
+import com.heima.accounting.ui.AnimatedBudgetGauge
+import com.heima.accounting.ui.AnimatedTrendChart
+import com.heima.accounting.ui.CategoryArtwork
+import com.heima.accounting.ui.SensitiveAmountText
+import com.heima.accounting.ui.TransactionRow
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,16 +49,27 @@ import java.util.Locale
 
 @Composable
 fun HomeScreen(
+    snapshot: LedgerSnapshot,
     amountsVisible: Boolean,
     onAmountsVisibleChange: (Boolean) -> Unit,
     onRecord: () -> Unit,
+    onOpenRecords: () -> Unit,
+    onTransactionClick: (Long) -> Unit,
 ) {
     val palette = HeimaTheme.palette
     val today = remember { LocalDate.now() }
-    val weekday = remember(today) {
-        today.format(DateTimeFormatter.ofPattern("EEEE", Locale.SIMPLIFIED_CHINESE))
-    }
+    val weekday = remember(today) { today.format(DateTimeFormatter.ofPattern("EEEE", Locale.SIMPLIFIED_CHINESE)) }
     val lunar = remember(today) { formatLunarDate(today) }
+    val todaySummary = remember(snapshot.transactions, today) {
+        FinanceRules.summarize(snapshot.transactions, FinanceRules.range(StatisticsPeriod.TODAY, today))
+    }
+    val monthSummary = remember(snapshot.transactions, today) {
+        FinanceRules.summarize(snapshot.transactions, FinanceRules.range(StatisticsPeriod.MONTH, today))
+    }
+    val budget = snapshot.budgets.firstOrNull { it.month == FinanceRules.monthKey(today) }
+    val remainingBudget = budget?.let { (it.amountCents - monthSummary.expenseCents).coerceAtLeast(0L) }
+    val recent = snapshot.transactions.take(6)
+    val health = FinanceRules.financialHealth(monthSummary, budget?.amountCents)
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -64,188 +77,119 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = dailyGreeting(today),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = palette.textSecondary,
-                    )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text(dailyGreeting(today), style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
                     Spacer(Modifier.height(5.dp))
-                    Text(
-                        text = "${today.monthValue}月${today.dayOfMonth}日 $weekday",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = palette.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "${today.year}年 · $lunar",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = palette.textTertiary,
-                    )
+                    Text("${today.monthValue}月${today.dayOfMonth}日 $weekday", style = MaterialTheme.typography.headlineLarge, color = palette.textPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("${today.year}年 · $lunar", style = MaterialTheme.typography.bodyMedium, color = palette.textTertiary)
                 }
                 PressableGlassSurface(
                     onClick = { onAmountsVisibleChange(!amountsVisible) },
-                    modifier = Modifier
-                        .size(50.dp)
-                        .semantics {
-                            contentDescription = if (amountsVisible) "隐藏所有金额" else "显示所有金额"
-                        },
+                    modifier = Modifier.size(50.dp).semantics { contentDescription = if (amountsVisible) "隐藏所有金额" else "显示所有金额" },
                     cornerRadius = 25.dp,
                     backdropBlur = true,
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.matchParentSize()) {
-                        PrivacyEyeIcon(
-                            visible = amountsVisible,
-                            modifier = Modifier.size(26.dp),
-                        )
-                    }
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { PrivacyEyeIcon(amountsVisible, Modifier.size(26.dp)) }
                 }
             }
         }
 
         item {
             Column {
-                Text(
-                    text = "今日消费",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = palette.textSecondary,
-                )
+                Text("今日消费", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
                 Spacer(Modifier.height(4.dp))
-                AnimatedContent(
-                    targetState = amountsVisible,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "home_amount_privacy",
-                ) { visible ->
-                    Text(
-                        text = privateAmount("¥0.00", visible),
-                        style = MaterialTheme.typography.displayLarge,
-                        color = palette.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    text = "今日收入  ${privateAmount("¥0.00", amountsVisible)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = palette.textSecondary,
-                )
+                SensitiveAmountText(todaySummary.expenseCents, amountsVisible, MaterialTheme.typography.displayLarge, palette.textPrimary)
+                SensitiveAmountText(todaySummary.incomeCents, amountsVisible, MaterialTheme.typography.bodyLarge, palette.textSecondary, prefix = "今日收入  ")
             }
         }
 
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                EntityCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(148.dp),
-                ) {
-                    Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = false) {
+                    Column(Modifier.padding(17.dp)) {
                         Text("本月趋势", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(11.dp))
-                        MiniTrend(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                        )
-                        Spacer(Modifier.height(5.dp))
-                        Text("等待第一笔账", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                        Spacer(Modifier.height(10.dp))
+                        AnimatedTrendChart(monthSummary.dailyTotals, Modifier.fillMaxWidth().height(56.dp))
+                        Spacer(Modifier.height(6.dp))
+                        Text(if (monthSummary.expenseCents == 0L) "等待第一笔账" else "本月 ${monthSummary.expenseCents.formatYuan()}", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                EntityCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(148.dp),
-                ) {
-                    Column {
-                        Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(11.dp))
-                        Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text("设置后显示进度", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = true) {
+                    Box(Modifier.matchParentSize().padding(17.dp)) {
+                        Column {
+                            Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(8.dp))
+                            if (remainingBudget == null) {
+                                Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
+                                Text("在预算页设置", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                            } else {
+                                SensitiveAmountText(remainingBudget, amountsVisible, MaterialTheme.typography.headlineMedium, palette.textPrimary)
+                                Text("本月可用", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        if (budget != null) AnimatedBudgetGauge(monthSummary.expenseCents.toFloat() / budget.amountCents, Modifier.size(62.dp).align(Alignment.BottomEnd))
                     }
                 }
             }
         }
 
         item {
-            GlassSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(154.dp),
-                cornerRadius = 28.dp,
-                backdropBlur = true,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .padding(horizontal = 20.dp, vertical = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+            GlassSurface(Modifier.fillMaxWidth().height(145.dp), cornerRadius = 28.dp, backdropBlur = true) {
+                Row(Modifier.matchParentSize().padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
                         Text("财务状态", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(3.dp))
-                        Text("等待记录", color = palette.brand, style = MaterialTheme.typography.headlineMedium)
-                        Text("记下第一笔后，这里会给出温和提示", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text(health, color = palette.brand, style = MaterialTheme.typography.headlineMedium)
+                        Text(if (snapshot.transactions.isEmpty()) "记下第一笔后，这里会给出温和提示" else "根据本月收支与预算给出的本地提示", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Box(
-                        modifier = Modifier.size(76.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Canvas(Modifier.matchParentSize()) {
-                            drawCircle(palette.brandSoft.copy(alpha = 0.78f))
-                            drawCircle(
-                                color = palette.brand.copy(alpha = 0.66f),
-                                radius = size.minDimension * 0.30f,
-                                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
-                            )
-                            drawCircle(
-                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.52f),
-                                radius = size.minDimension * 0.38f,
-                                center = Offset(size.width * 0.38f, size.height * 0.32f),
-                                style = Stroke(width = 1.5.dp.toPx()),
-                            )
+                    Canvas(Modifier.size(74.dp)) {
+                        drawCircle(palette.brandSoft.copy(alpha = 0.72f))
+                        drawCircle(palette.brand, radius = size.minDimension * 0.30f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
+                    }
+                }
+            }
+        }
+
+        item { SectionHeading("分类支出洞察") }
+        if (monthSummary.categoryTotals.isEmpty()) {
+            item { EntityCard(Modifier.fillMaxWidth()) { EmptyIllustration("有账目后，这里会展示花得最多的分类", Modifier.fillMaxWidth().padding(vertical = 8.dp)) } }
+        } else {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(monthSummary.categoryTotals.take(6), key = { it.categoryId }) { total ->
+                        val category = snapshot.category(total.categoryId)
+                        GlassSurface(Modifier.size(width = 132.dp, height = 142.dp), cornerRadius = 24.dp, backdropBlur = false) {
+                            Column(Modifier.padding(15.dp)) {
+                                CategoryArtwork(category?.iconKey ?: "other", Modifier.size(52.dp))
+                                Spacer(Modifier.height(3.dp))
+                                Text(category?.name ?: "未分类", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
+                                SensitiveAmountText(total.amountCents, amountsVisible, MaterialTheme.typography.labelLarge, palette.textSecondary)
+                                Text("${(total.ratio * 100).toInt()}%", color = palette.brand, style = MaterialTheme.typography.labelMedium)
+                            }
                         }
                     }
                 }
             }
         }
 
-        item { SectionHeading(title = "分类支出洞察") }
-
-        item {
-            EntityCard(modifier = Modifier.fillMaxWidth()) {
-                EmptyIllustration(
-                    label = "有账目后，这里会展示花得最多的分类",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                )
+        item { SectionHeading("最近账单", action = "查看全部", onAction = onOpenRecords) }
+        if (recent.isEmpty()) {
+            item {
+                PressableGlassSurface(onRecord, Modifier.fillMaxWidth(), cornerRadius = 24.dp, backdropBlur = true) {
+                    Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
+                        Text("还没有账单", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(5.dp))
+                        Text("点击这里或底部记账按钮，开始记录真实收支", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
             }
-        }
-
-        item { SectionHeading(title = "最近账单", action = "查看全部") }
-
-        item {
-            PressableGlassSurface(
-                onClick = onRecord,
-                modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 24.dp,
-                backdropBlur = true,
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
-                ) {
-                    Text("还没有账单", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(5.dp))
-                    Text("点击这里或底部记账按钮，开始记录真实收支", color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            item {
+                GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 25.dp, backdropBlur = false) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                        recent.forEach { transaction -> TransactionRow(transaction, snapshot, amountsVisible, { onTransactionClick(transaction.id) }) }
+                    }
                 }
             }
         }
@@ -253,121 +197,29 @@ fun HomeScreen(
 }
 
 @Composable
-private fun PrivacyEyeIcon(
-    visible: Boolean,
-    modifier: Modifier = Modifier,
-) {
+private fun PrivacyEyeIcon(visible: Boolean, modifier: Modifier = Modifier) {
     val palette = HeimaTheme.palette
-    val progress by animateFloatAsState(
-        targetValue = if (visible) 0f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "privacy_eye",
-    )
-    val color by animateColorAsState(
-        targetValue = if (visible) palette.brand else palette.textSecondary,
-        label = "privacy_eye_color",
-    )
     Canvas(modifier) {
-        val eye = Path().apply {
-            moveTo(size.width * 0.10f, size.height * 0.50f)
-            cubicTo(
-                size.width * 0.27f,
-                size.height * 0.20f,
-                size.width * 0.73f,
-                size.height * 0.20f,
-                size.width * 0.90f,
-                size.height * 0.50f,
-            )
-            cubicTo(
-                size.width * 0.73f,
-                size.height * 0.80f,
-                size.width * 0.27f,
-                size.height * 0.80f,
-                size.width * 0.10f,
-                size.height * 0.50f,
-            )
-        }
-        drawPath(eye, color, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
-        drawCircle(
-            color = color.copy(alpha = 1f - progress * 0.52f),
-            radius = size.minDimension * 0.13f,
-            center = center,
-        )
-        if (progress > 0.01f) {
-            drawLine(
-                color = color,
-                start = Offset(size.width * (0.18f - progress * 0.04f), size.height * 0.18f),
-                end = Offset(size.width * (0.82f + progress * 0.04f), size.height * 0.82f),
-                strokeWidth = 2.6.dp.toPx() * progress,
-                cap = StrokeCap.Round,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MiniTrend(modifier: Modifier = Modifier) {
-    val palette = HeimaTheme.palette
-    Canvas(modifier = modifier) {
-        val y = size.height * 0.68f
-        drawLine(
-            color = palette.divider,
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = 1.dp.toPx(),
-        )
         val path = Path().apply {
-            moveTo(0f, y)
-            cubicTo(
-                size.width * 0.30f,
-                y,
-                size.width * 0.58f,
-                y - size.height * 0.18f,
-                size.width,
-                y - size.height * 0.08f,
-            )
+            moveTo(size.width * 0.08f, size.height * 0.50f)
+            cubicTo(size.width * 0.28f, size.height * 0.17f, size.width * 0.72f, size.height * 0.17f, size.width * 0.92f, size.height * 0.50f)
+            cubicTo(size.width * 0.72f, size.height * 0.83f, size.width * 0.28f, size.height * 0.83f, size.width * 0.08f, size.height * 0.50f)
         }
-        drawPath(
-            path = path,
-            color = palette.brand.copy(alpha = 0.48f),
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
-        )
+        drawPath(path, palette.textSecondary, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+        drawCircle(palette.textSecondary, radius = size.minDimension * 0.12f)
+        if (!visible) drawLine(palette.textSecondary, Offset(size.width * 0.18f, size.height * 0.16f), Offset(size.width * 0.82f, size.height * 0.84f), 2.3.dp.toPx(), StrokeCap.Round)
     }
 }
 
 internal fun dailyGreeting(date: LocalDate): String {
-    val greetings = listOf(
-        "你好，今天也轻松记一笔",
-        "把日常记清，也把生活过轻",
-        "每一笔，都是生活留下的脚印",
-        "慢慢记录，心里自然更有数",
-        "今天的钱，也值得被温柔看见",
-        "简单记下，安心生活",
-        "看见收支，也看见自己的节奏",
-    )
-    return greetings[Math.floorMod(date.toEpochDay(), greetings.size.toLong()).toInt()]
+    val greetings = listOf("每一笔，都是生活留下的脚印", "把今天的收支，轻轻放进账本", "认真记录，也是在照顾未来的自己", "看清钱的方向，生活更从容", "今天也留一点时间给自己的账本", "小小一笔，慢慢拼出生活全貌", "让每一份所得与付出都有迹可循")
+    return greetings[Math.floorMod(date.toEpochDay().toInt(), greetings.size)]
 }
 
 internal fun formatLunarDate(date: LocalDate): String {
     val calendar = Calendar.getInstance(ULocale("zh_CN@calendar=chinese"))
-    calendar.timeInMillis = date
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli()
-    val months = listOf("正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊")
-    val days = listOf(
-        "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
-        "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
-        "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十",
-    )
-    val month = calendar.get(Calendar.MONTH).coerceIn(0, months.lastIndex)
-    val day = (calendar.get(Calendar.DAY_OF_MONTH) - 1).coerceIn(0, days.lastIndex)
-    val leap = if (calendar.get(Calendar.IS_LEAP_MONTH) == 1) "闰" else ""
-    return "农历$leap${months[month]}月${days[day]}"
+    calendar.timeInMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val months = listOf("正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "腊月")
+    val days = listOf("初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十")
+    return "农历${months[calendar.get(Calendar.MONTH).coerceIn(0, 11)]}${days[(calendar.get(Calendar.DAY_OF_MONTH) - 1).coerceIn(0, 29)]}"
 }
-
-private fun privateAmount(value: String, visible: Boolean): String =
-    if (visible) value else "¥••••"

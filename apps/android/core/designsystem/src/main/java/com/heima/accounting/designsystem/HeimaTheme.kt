@@ -60,9 +60,14 @@ data class HeimaPalette(
 data class HeimaMotion(
     val reduceMotion: Boolean,
     val quality: VisualQuality,
+    val liquidGlassEnabled: Boolean,
+    val darkTheme: Boolean,
 ) {
     val decorationsEnabled: Boolean
-        get() = !reduceMotion && quality != VisualQuality.POWER_SAVER
+        get() = !reduceMotion && liquidGlassEnabled && quality != VisualQuality.POWER_SAVER
+
+    val expensiveGlassEnabled: Boolean
+        get() = liquidGlassEnabled && quality != VisualQuality.POWER_SAVER
 }
 
 private val LiquidLight = HeimaPalette(
@@ -159,7 +164,12 @@ private val NatureDark = HeimaPalette(
 
 val LocalHeimaPalette = staticCompositionLocalOf { LiquidLight }
 val LocalHeimaMotion = staticCompositionLocalOf {
-    HeimaMotion(reduceMotion = false, quality = VisualQuality.AUTO)
+    HeimaMotion(
+        reduceMotion = false,
+        quality = VisualQuality.AUTO,
+        liquidGlassEnabled = true,
+        darkTheme = false,
+    )
 }
 
 object HeimaTheme {
@@ -265,6 +275,7 @@ fun HeimaAccountingTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     quality: VisualQuality = VisualQuality.AUTO,
     reduceMotion: Boolean = false,
+    liquidGlassEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val palette = when (style) {
@@ -274,7 +285,7 @@ fun HeimaAccountingTheme(
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalHeimaPalette provides palette,
-        LocalHeimaMotion provides HeimaMotion(reduceMotion, quality),
+        LocalHeimaMotion provides HeimaMotion(reduceMotion, quality, liquidGlassEnabled, darkTheme),
     ) {
         MaterialTheme(
             colorScheme = palette.toMaterialScheme(darkTheme),
