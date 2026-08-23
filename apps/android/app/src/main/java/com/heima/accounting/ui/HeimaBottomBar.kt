@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,13 +31,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +64,8 @@ import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /** A continuous glass bar with one restrained sliding selection lens. */
 @Composable
@@ -65,6 +75,8 @@ fun HeimaBottomBar(
     onRecord: () -> Unit,
     recordPanelVisible: Boolean,
     backdrop: Backdrop,
+    navigationProgress: Float,
+    onBoundaryFeedback: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = HeimaTheme.palette
@@ -74,15 +86,17 @@ fun HeimaBottomBar(
     // while a second real-time refraction animation is competing for the same frame.
     val lensTarget = selected
     val lensPosition = remember { Animatable(lensTarget.ordinal.toFloat()) }
+    val animationScope = rememberCoroutineScope()
+    var draggingLens by remember { mutableStateOf(false) }
+    var lastBoundary by remember { mutableIntStateOf(lensTarget.ordinal) }
+    var dragMorph by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(lensTarget) {
-        lensPosition.animateTo(
-            lensTarget.ordinal.toFloat(),
-            if (motion.reduceMotion) tween(70) else spring(
-                dampingRatio = 0.88f,
-                stiffness = 430f,
-            ),
-        )
+    LaunchedEffect(navigationProgress) {
+        if (!draggingLens) {
+            // Pager drag already supplies a continuous fraction; applying a second
+            // spring here would make the lens lag behind the finger.
+            lensPosition.snapTo(navigationProgress)
+        }
     }
 
     GlassSurface(
@@ -93,9 +107,54 @@ fun HeimaBottomBar(
     ) {
         BoxWithConstraints(Modifier.matchParentSize()) {
             val slotWidth = maxWidth / AppDestination.entries.size
+            val slotWidthPx = with(LocalDensity.current) { slotWidth.toPx() }
             val lensWidth = slotWidth - 8.dp
             val x = slotWidth * lensPosition.value + (slotWidth - lensWidth) / 2
-            val velocityStretch = if (motion.reduceMotion) 0f else min(abs(lensPosition.velocity) * 0.025f, 0.13f)
+            val velocityStretch = if (motion.reduceMotion) 0f else {
+                maxOf(min(abs(lensPosition.velocity) * 0.025f, 0.13f), min(abs(dragMorph) * .16f, .12f))
+            }
+            fun settleLens(openRecordWhenSelected: Boolean) {
+                val targetIndex = lensPosition.value.roundToInt().coerceIn(0, AppDestination.entries.lastIndex)
+                draggingLens = false
+                dragMorph = 0f
+                animationScope.launch {
+                    lensPosition.animateTo(
+                        targetIndex.toFloat(),
+                        if (motion.reduceMotion) tween(70) else spring(dampingRatio = .86f, stiffness = 460f),
+                    )
+                    val target = AppDestination.entries[targetIndex]
+                    if (target == AppDestination.RECORD) {
+                        if (openRecordWhenSelected) onRecord()
+                    } else {
+                        onDestinationSelected(target)
+                    }
+                }
+            }
+            val lensDragModifier = Modifier.pointerInput(slotWidthPx, motion.reduceMotion) {
+                detectDragGestures(
+                    onDragStart = {
+                        draggingLens = true
+                        lastBoundary = lensPosition.value.roundToInt()
+                    },
+                    onDragEnd = { settleLens(openRecordWhenSelected = true) },
+                    onDragCancel = {
+                        draggingLens = false
+                        dragMorph = 0f
+                        animationScope.launch { lensPosition.animateTo(lensTarget.ordinal.toFloat()) }
+                    },
+                ) { change, dragAmount ->
+                    change.consume()
+                    dragMorph = (dragAmount.x / slotWidthPx).coerceIn(-1f, 1f)
+                    val next = (lensPosition.value + dragAmount.x / slotWidthPx)
+                        .coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+                    val boundary = next.roundToInt()
+                    if (boundary != lastBoundary) {
+                        lastBoundary = boundary
+                        onBoundaryFeedback()
+                    }
+                    animationScope.launch { lensPosition.snapTo(next) }
+                }
+            }
             val baseLens = Modifier
                 .offset { IntOffset(x.roundToPx(), 8.dp.roundToPx()) }
                 .width(lensWidth)
@@ -154,6 +213,24 @@ fun HeimaBottomBar(
                     )
                 }
             }
+            // Keep a drag target above the tab row only where the current lens is.
+            // This makes the lens draggable without hijacking horizontal gestures
+            // across the whole navigation bar.
+            Box(
+                Modifier
+                    .offset { IntOffset(x.roundToPx(), 8.dp.roundToPx()) }
+                    .width(lensWidth)
+                    .height(60.dp)
+                    .semantics { contentDescription = "底部导航选中镜片，可左右拖动" }
+                    .then(lensDragModifier)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        if (lensTarget == AppDestination.RECORD) onRecord()
+                        else onDestinationSelected(lensTarget)
+                    },
+            )
         }
     }
 }

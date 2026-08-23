@@ -76,4 +76,29 @@ class FinanceRulesTest {
         assertEquals(808_000L, summary.expenseCents)
         assertEquals(202_000L, summary.incomeCents)
     }
+
+    @Test fun donutKeepsTopFiveAndAggregatesEveryRemainingCategory() {
+        val totals = (1..12).map { index ->
+            CategoryTotal(
+                categoryId = "category_$index",
+                amountCents = (1_300L - index * 75L),
+                ratio = if (index <= 5) .12f - index * .006f else .02f,
+            )
+        }
+
+        val slices = FinanceRules.categoryChartSlices(totals)
+
+        assertEquals(6, slices.size)
+        assertEquals(5, slices.count { !it.isOther })
+        assertTrue(slices.last().isOther)
+        assertEquals(7, slices.last().sourceCategoryIds.size)
+        assertEquals(totals.drop(5).sumOf(CategoryTotal::amountCents), slices.last().amountCents)
+    }
+
+    @Test fun customDateRangeContainsBothBoundaryDays() {
+        val range = DateRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 15))
+        assertTrue(LocalDate.of(2026, 8, 1) in range)
+        assertTrue(LocalDate.of(2026, 8, 15) in range)
+        assertTrue(LocalDate.of(2026, 8, 16) !in range)
+    }
 }

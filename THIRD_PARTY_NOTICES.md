@@ -26,7 +26,11 @@
 
 ## 仅研究、未进入最终 APK
 
-`QmDeve/AndroidLiquidGlassView`（MIT，Copyright © 2025 Donny Yale）用于理解 Refraction、Dispersion、Touch、Elastic、Draggable 和缓存边界；最终没有复制其源文件，也没有把它加入 Gradle 依赖。参考仓库：https://github.com/QmDeve/AndroidLiquidGlassView
+- `QmDeve/AndroidLiquidGlassView`（MIT，Copyright © 2025 Donny Yale）：研究 Refraction、Dispersion、Touch、Elastic、Draggable 和缓存边界。
+- `android/nowinandroid`（Apache License 2.0）：研究独立 Light/Dark ColorScheme、设置单向数据流和 Snackbar 事件。
+- `android/performance-samples`（Apache License 2.0）：研究 Jank、启动和 Macrobenchmark 测试边界。
+
+以上研究项目没有源文件复制进黑马记账，也没有新增对应 Gradle 依赖。AndroidX `HorizontalPager` 来自已经声明的 AndroidX/Compose 依赖。
 
 ## 项目自有素材
 

@@ -7,8 +7,12 @@ import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.MonthlyBudget
 import com.heima.accounting.domain.Transaction
+import com.heima.accounting.domain.DateRange
+import com.heima.accounting.domain.FinanceRules
+import com.heima.accounting.domain.StatisticsResult
 import java.io.File
 import java.util.UUID
+import java.time.ZoneId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,6 +140,19 @@ class AccountingRepository(
 
     suspend fun refresh() = withContext(ioDispatcher) { refreshInternal() }
 
+    suspend fun statistics(
+        range: DateRange,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): StatisticsResult = withContext(ioDispatcher) {
+        val start = range.startInclusive.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val endExclusive = range.endInclusive.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val transactions = database.readTransactionsBetween(start, endExclusive)
+        StatisticsResult(
+            summary = FinanceRules.summarize(transactions, range, zoneId),
+            transactions = transactions.filterNot(Transaction::excludedFromStatistics),
+        )
+    }
+
     override fun close() = database.close()
 
     private suspend fun <T> mutate(block: () -> T): T = writeMutex.withLock {
@@ -173,4 +190,3 @@ class AccountingRepository(
         }
     }
 }
-

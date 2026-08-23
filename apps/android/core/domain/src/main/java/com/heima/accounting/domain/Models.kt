@@ -77,6 +77,20 @@ data class FinanceSummary(
     val balanceCents: Long get() = incomeCents - expenseCents
 }
 
+data class StatisticsResult(
+    val summary: FinanceSummary = FinanceSummary(),
+    val transactions: List<Transaction> = emptyList(),
+)
+
+data class CategoryChartSlice(
+    val categoryId: String?,
+    val amountCents: Long,
+    val ratio: Float,
+    val sourceCategoryIds: Set<String>,
+) {
+    val isOther: Boolean get() = categoryId == null
+}
+
 enum class StatisticsPeriod { TODAY, WEEK, MONTH, YEAR, ALL }
 
 data class DateRange(
@@ -87,4 +101,3 @@ data class DateRange(
     operator fun contains(date: LocalDate): Boolean =
         !date.isBefore(startInclusive) && !date.isAfter(endInclusive)
 }
-

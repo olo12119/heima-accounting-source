@@ -33,28 +33,45 @@ enum class VisualQuality {
 }
 
 @Immutable
-data class HeimaPalette(
+data class AppThemeTokens(
     val background: Color,
     val backgroundSecondary: Color,
     val surface: Color,
-    val surfaceMuted: Color,
-    val glassTop: Color,
-    val glassBottom: Color,
-    val glassStroke: Color,
+    val surfaceElevated: Color,
+    val surfaceVariant: Color,
+    val outline: Color,
+    val glassBase: Color,
+    val glassTint: Color,
     val glassHighlight: Color,
+    val glassOutline: Color,
+    val glassShadow: Color,
     val brand: Color,
     val brandSoft: Color,
     val accent: Color,
-    val income: Color,
-    val expense: Color,
-    val warning: Color,
+    val positiveColor: Color,
+    val negativeColor: Color,
+    val warningColor: Color,
     val textPrimary: Color,
     val textSecondary: Color,
-    val textTertiary: Color,
+    val textMuted: Color,
     val divider: Color,
     val ambientOne: Color,
     val ambientTwo: Color,
-)
+    val chartColors: List<Color>,
+) {
+    // Compatibility names keep feature code readable while all values originate
+    // from the independent light/dark token set above.
+    val surfaceMuted: Color get() = surfaceVariant
+    val glassTop: Color get() = glassBase
+    val glassBottom: Color get() = glassTint
+    val glassStroke: Color get() = glassOutline
+    val income: Color get() = positiveColor
+    val expense: Color get() = negativeColor
+    val warning: Color get() = warningColor
+    val textTertiary: Color get() = textMuted
+}
+
+typealias HeimaPalette = AppThemeTokens
 
 @Immutable
 data class HeimaMotion(
@@ -64,102 +81,118 @@ data class HeimaMotion(
     val darkTheme: Boolean,
 ) {
     val decorationsEnabled: Boolean
-        get() = !reduceMotion && liquidGlassEnabled && quality != VisualQuality.POWER_SAVER
+        get() = liquidGlassEnabled && quality != VisualQuality.POWER_SAVER
 
     val expensiveGlassEnabled: Boolean
         get() = liquidGlassEnabled && quality != VisualQuality.POWER_SAVER
 }
 
-private val LiquidLight = HeimaPalette(
+private val LiquidLight = AppThemeTokens(
     background = Color(0xFFF7F9FD),
     backgroundSecondary = Color(0xFFEEF3FB),
     surface = Color(0xFFFDFEFF),
-    surfaceMuted = Color(0xFFF2F5FA),
-    glassTop = Color(0xF2FFFFFF),
-    glassBottom = Color(0xCDEAF1FF),
-    glassStroke = Color(0xC9FFFFFF),
+    surfaceElevated = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFF2F5FA),
+    outline = Color(0xFFCBD4E2),
+    glassBase = Color(0xF2FFFFFF),
+    glassTint = Color(0xCDEAF1FF),
     glassHighlight = Color(0xA8FFFFFF),
+    glassOutline = Color(0xC9FFFFFF),
+    glassShadow = Color(0x24274768),
     brand = Color(0xFF477FF5),
     brandSoft = Color(0xFFDCE8FF),
     accent = Color(0xFF72B9FF),
-    income = Color(0xFF2BA77B),
-    expense = Color(0xFF376EDB),
-    warning = Color(0xFFE5A84B),
+    positiveColor = Color(0xFF2BA77B),
+    negativeColor = Color(0xFF376EDB),
+    warningColor = Color(0xFFE5A84B),
     textPrimary = Color(0xFF131A28),
     textSecondary = Color(0xFF5F6878),
-    textTertiary = Color(0xFF9099A8),
+    textMuted = Color(0xFF9099A8),
     divider = Color(0x1A2C3850),
     ambientOne = Color(0xFFBFD7FF),
     ambientTwo = Color(0xFFD7F2FF),
+    chartColors = listOf(Color(0xFF5A86F7), Color(0xFF2BB39A), Color(0xFFFFA85C), Color(0xFFA46AF1), Color(0xFFEF6D8E), Color(0xFF7F8DA6)),
 )
 
-private val LiquidDark = HeimaPalette(
-    background = Color(0xFF111722),
-    backgroundSecondary = Color(0xFF182130),
-    surface = Color(0xFF1C2533),
-    surfaceMuted = Color(0xFF222D3D),
-    glassTop = Color(0xD9394658),
-    glassBottom = Color(0xB5212C3C),
-    glassStroke = Color(0x4DFFFFFF),
-    glassHighlight = Color(0x5FFFFFFF),
+private val LiquidDark = AppThemeTokens(
+    background = Color(0xFF0C121C),
+    backgroundSecondary = Color(0xFF111B29),
+    surface = Color(0xFF151E2B),
+    surfaceElevated = Color(0xFF1B2635),
+    surfaceVariant = Color(0xFF222F40),
+    outline = Color(0xFF445269),
+    glassBase = Color(0xE61B2737),
+    glassTint = Color(0xD9233144),
+    glassHighlight = Color(0x24D8E8FF),
+    glassOutline = Color(0x33BFD5F4),
+    glassShadow = Color(0x8A05080E),
     brand = Color(0xFF76A4FF),
     brandSoft = Color(0xFF263C68),
     accent = Color(0xFF81C8FF),
-    income = Color(0xFF61D4A7),
-    expense = Color(0xFF83A9FF),
-    warning = Color(0xFFF2C46D),
+    positiveColor = Color(0xFF61D4A7),
+    negativeColor = Color(0xFF83A9FF),
+    warningColor = Color(0xFFF2C46D),
     textPrimary = Color(0xFFF5F7FC),
     textSecondary = Color(0xFFBEC7D6),
-    textTertiary = Color(0xFF8C98AA),
+    textMuted = Color(0xFF8C98AA),
     divider = Color(0x24FFFFFF),
-    ambientOne = Color(0xFF2E4F89),
-    ambientTwo = Color(0xFF224A62),
+    ambientOne = Color(0xFF1C3760),
+    ambientTwo = Color(0xFF173646),
+    chartColors = listOf(Color(0xFF7EA7FF), Color(0xFF51D2B4), Color(0xFFFFBB78), Color(0xFFBE91FF), Color(0xFFFF8EAA), Color(0xFFA7B1C5)),
 )
 
-private val NatureLight = HeimaPalette(
+private val NatureLight = AppThemeTokens(
     background = Color(0xFFF7F5EC),
     backgroundSecondary = Color(0xFFEFF2E4),
     surface = Color(0xFFFFFEF7),
-    surfaceMuted = Color(0xFFF1F0E6),
-    glassTop = Color(0xF4FFFFFA),
-    glassBottom = Color(0xD8E4EBD8),
-    glassStroke = Color(0xD8FFFFFF),
+    surfaceElevated = Color(0xFFFFFFFB),
+    surfaceVariant = Color(0xFFF1F0E6),
+    outline = Color(0xFFCAD0C2),
+    glassBase = Color(0xF4FFFFFA),
+    glassTint = Color(0xD8E4EBD8),
     glassHighlight = Color(0xB8FFFFFF),
+    glassOutline = Color(0xD8FFFFFF),
+    glassShadow = Color(0x24384535),
     brand = Color(0xFF5D8D70),
     brandSoft = Color(0xFFDCEBDD),
     accent = Color(0xFF89AF8C),
-    income = Color(0xFF4A9171),
-    expense = Color(0xFFB47B55),
-    warning = Color(0xFFC8954D),
+    positiveColor = Color(0xFF4A9171),
+    negativeColor = Color(0xFFB47B55),
+    warningColor = Color(0xFFC8954D),
     textPrimary = Color(0xFF252A24),
     textSecondary = Color(0xFF666D62),
-    textTertiary = Color(0xFF959B90),
+    textMuted = Color(0xFF959B90),
     divider = Color(0x1F4B594A),
     ambientOne = Color(0xFFC9DEBA),
     ambientTwo = Color(0xFFD9E9D0),
+    chartColors = listOf(Color(0xFF5E9673), Color(0xFF7CA8A0), Color(0xFFD69A67), Color(0xFF9C7FBE), Color(0xFFC97E87), Color(0xFF8A9586)),
 )
 
-private val NatureDark = HeimaPalette(
-    background = Color(0xFF172019),
-    backgroundSecondary = Color(0xFF1D2A21),
-    surface = Color(0xFF233028),
-    surfaceMuted = Color(0xFF29372E),
-    glassTop = Color(0xD83A4A3F),
-    glassBottom = Color(0xB526352C),
-    glassStroke = Color(0x45FFFFFF),
-    glassHighlight = Color(0x52FFFFFF),
+private val NatureDark = AppThemeTokens(
+    background = Color(0xFF101712),
+    backgroundSecondary = Color(0xFF162119),
+    surface = Color(0xFF1A251E),
+    surfaceElevated = Color(0xFF202D25),
+    surfaceVariant = Color(0xFF28372D),
+    outline = Color(0xFF465A4C),
+    glassBase = Color(0xE3213027),
+    glassTint = Color(0xD1283A2F),
+    glassHighlight = Color(0x20DFF5E5),
+    glassOutline = Color(0x31C9E0CF),
+    glassShadow = Color(0x8A050A06),
     brand = Color(0xFF91C7A2),
     brandSoft = Color(0xFF294735),
     accent = Color(0xFFADD19F),
-    income = Color(0xFF83D0A8),
-    expense = Color(0xFFE1A47C),
-    warning = Color(0xFFE3BC70),
+    positiveColor = Color(0xFF83D0A8),
+    negativeColor = Color(0xFFE1A47C),
+    warningColor = Color(0xFFE3BC70),
     textPrimary = Color(0xFFF3F5EE),
     textSecondary = Color(0xFFC6CEC2),
-    textTertiary = Color(0xFF949E92),
+    textMuted = Color(0xFF949E92),
     divider = Color(0x24FFFFFF),
-    ambientOne = Color(0xFF34583C),
-    ambientTwo = Color(0xFF3D5740),
+    ambientOne = Color(0xFF27452F),
+    ambientTwo = Color(0xFF2C4432),
+    chartColors = listOf(Color(0xFF8AC8A0), Color(0xFF91C7C0), Color(0xFFE8AD7C), Color(0xFFC29DDF), Color(0xFFE39AA2), Color(0xFFAEBBAA)),
 )
 
 val LocalHeimaPalette = staticCompositionLocalOf { LiquidLight }
@@ -237,7 +270,7 @@ private val HeimaTypography = Typography(
     ),
 )
 
-private fun HeimaPalette.toMaterialScheme(isDark: Boolean): ColorScheme = if (isDark) {
+private fun AppThemeTokens.toMaterialScheme(isDark: Boolean): ColorScheme = if (isDark) {
     darkColorScheme(
         primary = brand,
         onPrimary = Color(0xFF0D1726),
@@ -245,11 +278,12 @@ private fun HeimaPalette.toMaterialScheme(isDark: Boolean): ColorScheme = if (is
         secondary = accent,
         background = background,
         surface = surface,
-        surfaceVariant = surfaceMuted,
+        surfaceContainer = surfaceElevated,
+        surfaceVariant = surfaceVariant,
         onBackground = textPrimary,
         onSurface = textPrimary,
         onSurfaceVariant = textSecondary,
-        outline = divider,
+        outline = outline,
         error = Color(0xFFFF8F87),
     )
 } else {
@@ -260,11 +294,12 @@ private fun HeimaPalette.toMaterialScheme(isDark: Boolean): ColorScheme = if (is
         secondary = accent,
         background = background,
         surface = surface,
-        surfaceVariant = surfaceMuted,
+        surfaceContainer = surfaceElevated,
+        surfaceVariant = surfaceVariant,
         onBackground = textPrimary,
         onSurface = textPrimary,
         onSurfaceVariant = textSecondary,
-        outline = divider,
+        outline = outline,
         error = Color(0xFFB3261E),
     )
 }

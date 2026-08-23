@@ -4,10 +4,10 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,13 +19,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.HeimaViewModel
 import com.heima.accounting.UiEvent
@@ -60,8 +63,15 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 private enum class ManagementPage { RECORDS, CATEGORIES, DATA }
+private val PagerDestinations = listOf(
+    AppDestination.HOME,
+    AppDestination.STATISTICS,
+    AppDestination.BUDGET,
+    AppDestination.PROFILE,
+)
 
 @Composable
 fun HeimaShell(
@@ -87,7 +97,20 @@ fun HeimaShell(
     onHapticEnabledChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
-    var destination by rememberSaveable { mutableStateOf(AppDestination.HOME) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { PagerDestinations.size })
+    val destination by remember {
+        derivedStateOf { PagerDestinations[pagerState.currentPage.coerceIn(PagerDestinations.indices)] }
+    }
+    val navigationProgress by remember {
+        derivedStateOf {
+            val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            when {
+                pagePosition <= 1f -> pagePosition
+                pagePosition <= 2f -> 1f + (pagePosition - 1f) * 2f
+                else -> pagePosition + 1f
+            }.coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+        }
+    }
     var managementPage by rememberSaveable { mutableStateOf<ManagementPage?>(null) }
     var recordPanelVisible by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
@@ -126,18 +149,36 @@ fun HeimaShell(
     }
 
     LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
+        viewModel.events.collectLatest { event ->
+            // A new one-shot event owns the single snackbar slot. Cancelling the
+            // previous collector must never restart or indefinitely extend its timer.
+            snackbar.currentSnackbarData?.dismiss()
             when (event) {
-                is UiEvent.Message -> snackbar.showSnackbar(event.text)
+                is UiEvent.Message -> snackbar.showSnackbar(event.text, duration = SnackbarDuration.Short)
                 is UiEvent.TransactionSaved -> {
                     feedback.confirm()
-                    snackbar.showSnackbar(if (event.transaction.id == 0L) "账单已保存" else "账单已保存")
+                    snackbar.showSnackbar("账单已保存", duration = SnackbarDuration.Short)
                 }
                 is UiEvent.TransactionDeleted -> {
                     feedback.important()
-                    if (snackbar.showSnackbar("账单已删除", "撤销") == SnackbarResult.ActionPerformed) viewModel.undoDelete(event.transaction)
+                    if (
+                        snackbar.showSnackbar(
+                            message = "账单已删除",
+                            actionLabel = "撤销",
+                            duration = SnackbarDuration.Short,
+                        ) == SnackbarResult.ActionPerformed
+                    ) {
+                        viewModel.undoDelete(event.transaction)
+                    }
                 }
-                is UiEvent.BackupRestored -> snackbar.showSnackbar("账本已恢复，恢复前副本已安全保留")
+                is UiEvent.TransactionRestored -> {
+                    feedback.undo()
+                    snackbar.showSnackbar("已恢复这笔账单", duration = SnackbarDuration.Short)
+                }
+                is UiEvent.BackupRestored -> snackbar.showSnackbar(
+                    "账本已恢复，恢复前副本已安全保留",
+                    duration = SnackbarDuration.Short,
+                )
             }
         }
     }
@@ -148,7 +189,21 @@ fun HeimaShell(
 
     ProvideCategoryArtwork {
         CompositionLocalProvider(LocalHeimaBackdrop provides backdrop) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .semantics {
+                        contentDescription = buildString {
+                            append(if (liquidGlassEnabled) "Liquid Glass 已开启" else "Liquid Glass 已关闭")
+                            append("；")
+                            append(if (soundEnabled) "操作音效已开启" else "操作音效已关闭")
+                            append("；")
+                            append(if (hapticEnabled) "触觉反馈已开启" else "触觉反馈已关闭")
+                            append("；")
+                            append(if (reduceMotion) "减少动态效果已开启" else "减少动态效果已关闭")
+                        }
+                    },
+            ) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -187,14 +242,26 @@ fun HeimaShell(
                         },
                         { openDocument.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
                     )
-                    else -> DestinationPage(destination, motion.reduceMotion) { screen ->
+                    else -> HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        beyondViewportPageCount = 0,
+                        userScrollEnabled = !recordPanelVisible,
+                        key = { PagerDestinations[it] },
+                    ) { page ->
+                        val screen = PagerDestinations[page]
                         when (screen) {
                             AppDestination.HOME -> HomeScreen(
                                 ledgerState.snapshot, amountsVisible, onAmountsVisibleChange,
                                 { recordPanelVisible = true }, { managementPage = ManagementPage.RECORDS },
                                 { editing = it.let { id -> ledgerState.snapshot.transactions.firstOrNull { transaction -> transaction.id == id } }; recordPanelVisible = editing != null },
                             )
-                            AppDestination.STATISTICS -> StatisticsScreen(ledgerState.snapshot, amountsVisible)
+                            AppDestination.STATISTICS -> StatisticsScreen(
+                                ledgerState.snapshot,
+                                amountsVisible,
+                                viewModel::loadStatistics,
+                                feedback::selection,
+                            )
                             AppDestination.BUDGET -> BudgetScreen(ledgerState.snapshot, amountsVisible, viewModel::saveBudget)
                             AppDestination.PROFILE -> ProfileScreen(
                                 ledgerState.snapshot.transactions.size, themeStyle, colorMode, visualQuality, reduceMotion, powerSaveMode,
@@ -203,7 +270,7 @@ fun HeimaShell(
                                 onLiquidGlassEnabledChange, onSoundEnabledChange, onHapticEnabledChange,
                                 { managementPage = ManagementPage.CATEGORIES }, { managementPage = ManagementPage.RECORDS }, { managementPage = ManagementPage.DATA },
                             )
-                            AppDestination.RECORD -> Unit
+                            AppDestination.RECORD -> error("记账是主操作，不是 Pager 页面")
                         }
                     }
                 }
@@ -212,10 +279,21 @@ fun HeimaShell(
             if (managementPage == null && ledgerState.integrityOkay && !ledgerState.loading && !recordPanelVisible) {
                 HeimaBottomBar(
                     destination,
-                    { if (it != AppDestination.RECORD) destination = it },
-                    { editing = null; recordPanelVisible = true },
+                    { target ->
+                        val page = PagerDestinations.indexOf(target)
+                        if (page >= 0) {
+                            feedback.selection()
+                            scope.launch {
+                                if (motion.reduceMotion) pagerState.scrollToPage(page)
+                                else pagerState.animateScrollToPage(page)
+                            }
+                        }
+                    },
+                    { feedback.selection(); editing = null; recordPanelVisible = true },
                     recordPanelVisible,
                     backdrop,
+                    navigationProgress,
+                    feedback::selection,
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 7.dp),
                 )
             }
@@ -243,6 +321,7 @@ fun HeimaShell(
                         { recordPanelVisible = false; editing = null },
                         { transaction -> viewModel.saveTransaction(transaction); recordPanelVisible = false; editing = null },
                         { managementPage = ManagementPage.CATEGORIES; recordPanelVisible = false },
+                        feedback::selection,
                     )
                 }
             }
@@ -268,33 +347,5 @@ private fun IntegrityError(message: String?) {
             Text("本地账本暂时无法打开", style = MaterialTheme.typography.headlineSmall)
             Text(message ?: "原数据文件已保留，应用没有自动删除或重建它。", Modifier.padding(top = 10.dp))
         }
-    }
-}
-
-@Composable
-private fun DestinationPage(destination: AppDestination, reduceMotion: Boolean, content: @Composable (AppDestination) -> Unit) {
-    // Only the selected page is composed. Keeping the old and new chart-heavy pages
-    // alive at the same time was the main source of rapid-tab jank.
-    var previousOrdinal by remember { mutableIntStateOf(destination.ordinal) }
-    val entrance = remember { Animatable(0f) }
-    LaunchedEffect(destination, reduceMotion) {
-        val direction = if (destination.ordinal >= previousOrdinal) 1f else -1f
-        previousOrdinal = destination.ordinal
-        if (reduceMotion) {
-            entrance.snapTo(0f)
-        } else {
-            entrance.snapTo(direction)
-            entrance.animateTo(0f, spring(dampingRatio = 0.92f, stiffness = 820f))
-        }
-    }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                translationX = entrance.value * 14.dp.toPx()
-                alpha = 1f - kotlin.math.abs(entrance.value) * 0.055f
-            },
-    ) {
-        content(destination)
     }
 }

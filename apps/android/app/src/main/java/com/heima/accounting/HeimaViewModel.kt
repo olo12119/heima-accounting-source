@@ -8,8 +8,11 @@ import com.heima.accounting.data.LedgerState
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.Transaction
+import com.heima.accounting.domain.DateRange
+import com.heima.accounting.domain.StatisticsResult
 import java.io.File
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -19,13 +22,20 @@ sealed interface UiEvent {
     data class Message(val text: String) : UiEvent
     data class TransactionSaved(val transaction: Transaction) : UiEvent
     data class TransactionDeleted(val transaction: Transaction) : UiEvent
+    data class TransactionRestored(val transaction: Transaction) : UiEvent
     data class BackupRestored(val safetyFile: File) : UiEvent
 }
 
 class HeimaViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AccountingRepository(application)
+    private val settingsRepository = SettingsRepository(application)
     val ledgerState: StateFlow<LedgerState> = repository.state
-    private val mutableEvents = MutableSharedFlow<UiEvent>(extraBufferCapacity = 8)
+    val settingsState: StateFlow<HeimaSettings> = settingsRepository.state
+    private val mutableEvents = MutableSharedFlow<UiEvent>(
+        replay = 0,
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     val events: SharedFlow<UiEvent> = mutableEvents.asSharedFlow()
 
     init { viewModelScope.launch { repository.initialize() } }
@@ -42,7 +52,7 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun undoDelete(transaction: Transaction) = launchOperation {
         repository.restoreDeletedTransaction(transaction)
-        mutableEvents.emit(UiEvent.Message("已恢复这笔账单"))
+        mutableEvents.emit(UiEvent.TransactionRestored(transaction))
     }
 
     fun saveBudget(month: String, amountCents: Long) = launchOperation {
@@ -68,11 +78,21 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun exportBackup(): String = repository.exportBackup()
     suspend fun exportCsv(): String = repository.exportCsv()
+    suspend fun loadStatistics(range: DateRange): StatisticsResult = repository.statistics(range)
 
     fun restoreBackup(json: String) = launchOperation {
         val safetyFile = repository.restoreBackup(json)
         mutableEvents.emit(UiEvent.BackupRestored(safetyFile))
     }
+
+    fun setThemeStyle(value: com.heima.accounting.designsystem.HeimaThemeStyle) = settingsRepository.setThemeStyle(value)
+    fun setColorMode(value: com.heima.accounting.designsystem.HeimaColorMode) = settingsRepository.setColorMode(value)
+    fun setVisualQuality(value: com.heima.accounting.designsystem.VisualQuality) = settingsRepository.setVisualQuality(value)
+    fun setLiquidGlassEnabled(value: Boolean) = settingsRepository.setLiquidGlassEnabled(value)
+    fun setSoundEnabled(value: Boolean) = settingsRepository.setSoundEnabled(value)
+    fun setHapticEnabled(value: Boolean) = settingsRepository.setHapticEnabled(value)
+    fun setReduceMotionEnabled(value: Boolean) = settingsRepository.setReduceMotionEnabled(value)
+    fun setAmountsVisible(value: Boolean) = settingsRepository.setAmountsVisible(value)
 
     private fun launchOperation(block: suspend () -> Unit) {
         viewModelScope.launch {

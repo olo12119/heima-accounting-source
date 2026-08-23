@@ -1364,3 +1364,59 @@ lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-
 - 最终报告同步更新为 `FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
 - 1.0.0 和更早 APK 已移入 `手机安装包/旧版本-请勿安装`；它们仅用于历史对照。
 - Git 保护源码和文档，不保护用户手机中的账单、正式签名密钥或未纳入 Git 的 APK；账单需使用 App 内备份，密钥需另行安全复制。
+
+## 2026-08-23：Android 1.0.2 第二轮交互、深色模式与正确性定型
+
+### 需求背景
+
+实际使用继续暴露出四类根因：深色模式仍缺少完整独立 Token；删除撤销提示可能被长期状态重复触发；主页面只能点击切换且底栏 Lens 缺少拖动；体验设置存在多份状态导致视觉、功能和持久化可能反向。同时统计缺少自定义单日/区间和分类过多时的可读方案，声音与触觉也没有统一行为入口。本轮不扩张业务范围，而是把这些问题下沉到主题、事件、设置仓库、导航和查询层统一修正。
+
+### 实现范围
+
+1. 重构 `AppThemeTokens`，为澄澈蓝和自然治愈分别定义 Light/Dark 的 background、surface、text、outline、glass、chart 和状态色；Dark Glass 不再复用浅色白色 Bloom。
+2. 新建 `SettingsRepository` 与 `HeimaSettings`，明确 `liquidGlassEnabled`、`soundEnabled`、`hapticEnabled`、`reduceMotionEnabled` 正向语义；SharedPreferences 只作为仓库内部持久化，ViewModel/UI/反馈引擎共用同一 StateFlow。
+3. 删除结果改为 SharedFlow 一次性事件，由 `SnackbarHostState` 与 `collectLatest` 管理约 4 秒生命周期；撤销恢复真实账单，新删除会结束旧提示。
+4. 首页、统计、预算、我的改为官方 `HorizontalPager`；记账保持 Primary Action。Bottom Lens 可拖动、速度轻微形变、吸附和边界触觉，拖过记账不误弹。
+5. 交互反馈拆分 Sound/Haptic/Visual。短音效由 `SoundPool` 一次预加载项目自有 WAV；按压反馈使用 0.97 Scale、Tint/Highlight 和短 Spring。
+6. 统计新增单日/日期区间 Glass Picker；范围转换为 SQLite `occurred_at >= ? AND occurred_at < ?` 查询，避免在 UI 读取全部数据后过滤。
+7. 分类结构采用 Top 5 + 其他，并优先合并低于 3% 的分类；“其他”可打开明细 Sheet，扇区选择显示金额、占比和对应账单。
+8. 新增 ON/OFF 行为截图、自然主题 Light/Dark、Pager、Lens Drag、日期范围、删除自动消失、设置持久化和反馈门测试；新增底栏拖动性能脚本。
+
+### 数据兼容
+
+- 数据库表结构没有改变，不需要 Migration；金额仍以整数分保存。
+- 统计仅新增按时间索引执行的范围查询，原账单、分类、预算和备份格式不变。
+- 设置沿用原 `heima_visual_preferences` 文件并读取既有键值；变量语义在仓库层统一，没有清空用户设置。
+- 正式包继续使用原发布密钥，1.0.2 可覆盖同签名旧版。
+
+### 真实失败、根因与修复
+
+1. 日历图形首次编译把 `CornerRadius` 从错误包导入；改用 `androidx.compose.ui.geometry.CornerRadius` 后重新编译通过。
+2. 完整模拟器测试初次受旧 Debug 签名冲突影响；只清理模拟器的 `.dev` 和 `.dev.test`，不触碰正式包或真实手机数据，最终 30 项通过。
+3. 删除 Snackbar 测试最初用不稳定滚动定位；改为按真实入口进入“全部账单”，再验证撤销和 6.5 秒内消失。
+4. ON/OFF 性能脚本首次并行执行，两个脚本相互 force-stop 同一包并输出 0 帧；该结果作废，改为严格顺序复测。
+5. PowerShell 默认执行策略拒绝项目脚本；仅给单次命令使用 `-ExecutionPolicy Bypass`，未更改系统长期策略。
+6. 签名首次缺少进程级 `JAVA_HOME`；补充 D 盘 JDK 后重新 zipalign、签名和验签成功。
+
+### 验证结果
+
+```text
+testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+:app:connectedDebugAndroidTest
+:app:lintRelease testDebugUnitTest
+:app:assembleRelease
+```
+
+- Release Lint：`No issues found`。
+- JVM 单元/规则测试：26 项通过，0 失败、0 错误、0 跳过。
+- Android 16 模拟器数据库/UI/手势/截图测试：30 项通过，0 失败、0 跳过。
+- 100、1000、10000 条数据替换与读回通过。
+- Glass ON：Sheet Jank 15.71%，Lens Drag Jank 9.66%；Glass OFF 分别为 13.68% 和 9.05%。这些是模拟器高压回归数，不冒充真机 120Hz 结论。
+- R8 Release、资源收缩、zipalign 与 APK v3 验签通过；模拟器覆盖安装后识别 `versionCode=102`、`versionName=1.0.2`，冷启动 622ms，日志无 App FATAL/ANR。
+
+### 交付与限制
+
+- 唯一推荐 APK：`手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
+- 大小：4,829,042 字节；SHA-256：`1270f828c5dc43747e5e1587ca566c657a661ed9c211591691fc7ded69672e01`。
+- 新增 `UX_REGRESSION_REPORT.md`，并更新最终、测试、性能、许可、运行和安装文档。
+- 真机扬声器、触觉、电池、温升、Thermal 和 90/120Hz 为 `NEEDS REAL DEVICE VERIFICATION`。

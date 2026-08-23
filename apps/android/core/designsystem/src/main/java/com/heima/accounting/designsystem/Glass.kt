@@ -64,7 +64,9 @@ fun GlassSurface(
         VisualQuality.POWER_SAVER -> 0.94f
     }
 
-    val opticalModifier = if (blurEnabled) {
+    val opticalModifier = when {
+        !material.liquidGlassEnabled -> Modifier.background(palette.surfaceElevated)
+        blurEnabled -> {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
@@ -77,9 +79,9 @@ fun GlassSurface(
                     chromaticAberration = false,
                 )
             },
-            highlight = { Highlight.Default.copy(alpha = if (material.darkTheme) .16f else .34f) },
-            shadow = { Shadow(alpha = if (material.darkTheme) .14f else .28f) },
-            innerShadow = { InnerShadow(radius = 5.dp, alpha = if (material.darkTheme) .10f else .20f) },
+            highlight = { Highlight.Default.copy(alpha = if (material.darkTheme) .07f else .34f) },
+            shadow = { Shadow(alpha = if (material.darkTheme) .12f else .28f) },
+            innerShadow = { InnerShadow(radius = 5.dp, alpha = if (material.darkTheme) .06f else .20f) },
             onDrawSurface = {
                 drawRect(
                     brush = Brush.linearGradient(
@@ -102,8 +104,8 @@ fun GlassSurface(
                 )
             },
         )
-    } else {
-        Modifier.background(
+        }
+        else -> Modifier.background(
             brush = Brush.verticalGradient(
                 listOf(
                     palette.glassTop.copy(alpha = surfaceAlpha),
@@ -118,18 +120,24 @@ fun GlassSurface(
             .shadow(
                 elevation = elevation,
                 shape = shape,
-                ambientColor = palette.brand.copy(alpha = 0.13f),
-                spotColor = Color.Black.copy(alpha = 0.14f),
+                ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .30f else .16f),
+                spotColor = palette.glassShadow,
             )
             .clip(shape)
             .then(opticalModifier)
-            .border(BorderStroke(1.dp, palette.glassStroke.copy(alpha = if (material.darkTheme) 0.40f else 0.88f)), shape)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (material.liquidGlassEnabled) palette.glassOutline else palette.outline.copy(alpha = .56f),
+                ),
+                shape,
+            )
             .drawWithCache {
                 val radiusPx = cornerRadius.toPx()
                 val rim = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = if (material.darkTheme) 0.13f else 0.72f),
-                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.11f else 0.36f),
+                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.24f else 0.72f),
+                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.14f else 0.36f),
                         palette.brand.copy(alpha = 0.14f),
                         Color.Transparent,
                     ),
@@ -140,8 +148,8 @@ fun GlassSurface(
                     colors = listOf(
                         Color.White.copy(
                             alpha = when {
-                                !material.liquidGlassEnabled -> 0.05f
-                                material.darkTheme -> 0.055f
+                                !material.liquidGlassEnabled -> 0f
+                                material.darkTheme -> 0.025f
                                 quality == VisualQuality.POWER_SAVER -> 0.12f
                                 else -> 0.32f
                             },
@@ -159,14 +167,14 @@ fun GlassSurface(
                         cornerRadius = CornerRadius(radiusPx, radiusPx),
                     )
                     drawContent()
-                    if (material.expensiveGlassEnabled) {
+                    if (material.liquidGlassEnabled && material.expensiveGlassEnabled) {
                         drawRoundRect(
                             brush = rim,
                             cornerRadius = CornerRadius(radiusPx, radiusPx),
                             style = Stroke(width = 1.4.dp.toPx()),
                         )
                         drawLine(
-                            color = Color.White.copy(alpha = if (material.darkTheme) 0.09f else 0.38f),
+                            color = palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.20f else 0.38f),
                             start = Offset(radiusPx * 0.72f, 1.4.dp.toPx()),
                             end = Offset(size.width - radiusPx * 0.72f, 1.4.dp.toPx()),
                             strokeWidth = 1.2.dp.toPx(),

@@ -12,7 +12,7 @@
 当前唯一正式文件：
 
 ```text
-手机安装包\黑马记账-Android-正式版-1.0.1.apk
+手机安装包\黑马记账-Android-正式版-1.0.2.apk
 ```
 
 它和 Android Studio 调试运行的区别：APK 用项目专用发布密钥签名，适合手机长期安装；Android Studio 运行的是 `.dev` 调试包，适合电脑开发检查。
@@ -37,8 +37,8 @@ Set-Location '.\apps\android'
 ```
 
 - `lintRelease`：以正式包配置检查 Android/Compose 错误和性能隐患。
-- JVM 测试：金额、日期、分类、CSV、备份和真实财务洞察等 23 项。
-- `connectedDebugAndroidTest`：在已启动的模拟器执行 21 项数据库和 UI 测试。
+- JVM 测试：金额、日期、分类、CSV、反馈门和真实财务洞察等 26 项。
+- `connectedDebugAndroidTest`：在已启动的模拟器执行 30 项数据库、UI、手势和截图测试。
 - `assembleRelease`：生成 R8 压缩的未签名 Release 中间产物。
 
 最终签名使用忽略 Git 的 `.local-signing/heima-release.jks`。密钥丢失后无法给现有用户做覆盖升级，因此必须单独备份。
@@ -48,6 +48,7 @@ Set-Location '.\apps\android'
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\measure-tab-performance.ps1" -PackageName "com.heima.accounting" -Cycles 12 -PauseMilliseconds 180
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\measure-record-sheet-performance.ps1" -PackageName "com.heima.accounting.dev" -MaterialMode ON -Cycles 12
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\measure-navigation-drag-performance.ps1" -PackageName "com.heima.accounting.dev" -MaterialMode ON -Cycles 8
 ```
 
 脚本固定针对 1080×2400 的项目模拟器。模拟器可以发现卡顿趋势，但不能代替真机电池、温度和厂商 GPU 验收。如果模拟器自身出现 System UI ANR 或固定异常 GPU 值，必须把该轮结果标为无效，不能归因给 App。

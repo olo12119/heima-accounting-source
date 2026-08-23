@@ -43,12 +43,11 @@
 
 ## 语义颜色
 
-页面不直接写死某个绿色或蓝色，而使用语义名称：
+页面不直接写死某个绿色或蓝色，而使用 `AppThemeTokens` 语义名称；每个主题分别提供 Light/Dark：
 
-- `backgroundBase`：页面背景。
-- `surfacePrimary`：主要实体卡片。
-- `surfaceSecondary`：次级区域。
-- `glassControl`：高级玻璃操作层。
+- `background`、`backgroundSecondary`：页面背景。
+- `surface`、`surfaceElevated`、`surfaceVariant`：不同层级实体卡片。
+- `glassBase`、`glassTint`、`glassHighlight`、`glassOutline`、`glassShadow`：玻璃材质。
 - `textPrimary`、`textSecondary`、`textTertiary`：三级文字。
 - `brandPrimary`、`brandAccent`：品牌主色与少量强调色。
 - `income`：收入。
@@ -116,8 +115,8 @@
 ### 导航与框架
 
 - `AppScaffold`：状态栏、安全区、页面背景和滚动框架。
-- `GlassTabBar`：五项底部导航。
-- `CentralRecordAction`：中央记账按钮。
+- `HeimaBottomBar`：连续玻璃底栏、可拖动 Selection Lens 和五项入口。
+- `PrimaryRecordAction`：属于同一连续底栏但具有最高优先级的中央记账入口。
 - `TopSummaryBar`：月份、隐私遮挡和账本状态。
 
 ### 首页与数据
@@ -133,7 +132,7 @@
 
 - `RecordBottomSheet`：可分阶段展开的记账面板。
 - `EntryTypeSelector`：收入、支出和高级类型。
-- `RollingAmountDisplay`：滚动金额显示。
+- `AmountDisplay`：自然输入和轻量 Blur/Fade，不使用干扰阅读的机械数字滚动。
 - `FinanceKeypad`：自定义数字键盘。
 - `CategoryCarousel`：常用与一级分类。
 - `SecondaryCategoryPicker`：二级分类。
@@ -141,17 +140,18 @@
 
 ### 统计与预算
 
-- `PeriodSwitcher`：日期范围。
+- `GlassSegmentedControl`：标准统计日期范围。
+- `LiquidGlassDateRangePicker`：单日与日期区间。
 - `TrendChartCard`：趋势图。
-- `CategoryDonut`：分类占比。
+- `CategoryDonut`：Top 5 + 其他的可交互分类占比。
 - `CategoryRanking`：分类排行。
 - `BudgetGauge`：预算仪表。
 - `BudgetCategoryRow`：分类预算。
 
 ### 个性化与系统
 
-- `ThemePreviewCard`：主题动态预览。
-- `FontPreviewCard`：字体实时样张。
+- `ThemeSwatch`：澄澈蓝/自然治愈色块选择。
+- `GlassToggle`：设置开关的统一方向、状态和降级材质。
 - `AdaptiveDialog`：确认和错误弹窗。
 - `SuccessEffect`：按主题变化的成功反馈。
 - `EmptyState`、`LoadingState`、`ErrorState`：完整页面状态。

@@ -7,6 +7,8 @@ import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.MonthlyBudget
 import com.heima.accounting.domain.Transaction
+import java.time.LocalDate
+import java.time.ZoneId
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -122,5 +124,30 @@ class DatabaseIntegrationTest {
             assertEquals(rowCount, restored.size)
             assertEquals(99L + rowCount, restored.first().amountCents)
         }
+    }
+
+    @Test fun dateRangeQueryFiltersInSqlAndIncludesTheLastLocalDay() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val august1 = LocalDate.of(2026, 8, 1).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        val august15 = LocalDate.of(2026, 8, 15).atTime(23, 59).atZone(zone).toInstant().toEpochMilli()
+        val august16 = LocalDate.of(2026, 8, 16).atStartOfDay(zone).toInstant().toEpochMilli()
+        listOf(august1, august15, august16).forEachIndexed { index, epoch ->
+            database.insertTransaction(
+                Transaction(
+                    type = EntryType.EXPENSE,
+                    amountCents = 100L + index,
+                    categoryId = "expense_food",
+                    occurredAtEpochMillis = epoch,
+                ),
+            )
+        }
+
+        val rows = database.readTransactionsBetween(
+            LocalDate.of(2026, 8, 1).atStartOfDay(zone).toInstant().toEpochMilli(),
+            LocalDate.of(2026, 8, 16).atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+
+        assertEquals(2, rows.size)
+        assertEquals(setOf(100L, 101L), rows.map(Transaction::amountCents).toSet())
     }
 }

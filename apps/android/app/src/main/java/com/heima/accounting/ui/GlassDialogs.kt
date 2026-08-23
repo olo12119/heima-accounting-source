@@ -47,6 +47,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.heima.accounting.designsystem.GlassFieldSurface
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
 import java.time.DayOfWeek
@@ -54,6 +55,9 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.heima.accounting.domain.DateRange
+
+enum class CustomDateMode { SINGLE, RANGE }
 
 @Composable
 fun GlassConfirmDialog(
@@ -130,6 +134,7 @@ fun LiquidGlassDatePicker(
     initialDate: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
+    onSelectionFeedback: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -176,9 +181,13 @@ fun LiquidGlassDatePicker(
             ) { month ->
                 CalendarMonthGrid(
                     month = month,
-                    selected = selectedDate,
+                    selectedStart = selectedDate,
+                    selectedEnd = null,
                     today = LocalDate.now(),
-                    onSelected = { selectedDate = it },
+                    onSelected = {
+                        onSelectionFeedback()
+                        selectedDate = it
+                    },
                 )
             }
             Spacer(Modifier.height(14.dp))
@@ -191,9 +200,133 @@ fun LiquidGlassDatePicker(
 }
 
 @Composable
+fun LiquidGlassDateRangePicker(
+    initialRange: DateRange,
+    onDismiss: () -> Unit,
+    onConfirm: (DateRange) -> Unit,
+    onSelectionFeedback: () -> Unit = {},
+) {
+    val palette = HeimaTheme.palette
+    val motion = HeimaTheme.motion
+    var mode by remember(initialRange) {
+        mutableStateOf(if (initialRange.startInclusive == initialRange.endInclusive) CustomDateMode.SINGLE else CustomDateMode.RANGE)
+    }
+    var startDate by remember(initialRange) { mutableStateOf(initialRange.startInclusive) }
+    var endDate by remember(initialRange) { mutableStateOf(initialRange.endInclusive) }
+    var selectingEnd by remember(initialRange) { mutableStateOf(false) }
+    var shownMonth by remember(initialRange) { mutableStateOf(YearMonth.from(initialRange.startInclusive)) }
+    var direction by remember { mutableIntStateOf(1) }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.SIMPLIFIED_CHINESE) }
+    val selectedLabel = if (mode == CustomDateMode.SINGLE) {
+        startDate.format(dateFormatter)
+    } else {
+        "${startDate.format(dateFormatter)}  至  ${endDate.format(dateFormatter)}"
+    }
+
+    HeimaDialogFrame(onDismiss, modifier = Modifier.widthIn(max = 410.dp)) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 20.dp)) {
+            Text("自定义统计日期", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(8.dp))
+            GlassSegmentedControl(
+                options = listOf(CustomDateMode.SINGLE to "单日", CustomDateMode.RANGE to "日期区间"),
+                selected = mode,
+                onSelected = { selectedMode ->
+                    mode = selectedMode
+                    selectingEnd = false
+                    if (selectedMode == CustomDateMode.SINGLE) endDate = startDate
+                },
+                accessibilityLabel = "自定义日期模式",
+                height = 44.dp,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                selectedLabel,
+                color = palette.textPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (mode == CustomDateMode.RANGE) {
+                Text(
+                    if (selectingEnd) "请选择结束日期" else "点击一个日期开始重新选择区间",
+                    color = palette.textMuted,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                CalendarArrow("上一个月", "‹") { direction = -1; shownMonth = shownMonth.minusMonths(1) }
+                Text("${shownMonth.year}年${shownMonth.monthValue}月", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
+                CalendarArrow("下一个月", "›") { direction = 1; shownMonth = shownMonth.plusMonths(1) }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth()) {
+                listOf("一", "二", "三", "四", "五", "六", "日").forEach { label ->
+                    Text(label, Modifier.weight(1f), color = palette.textMuted, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                }
+            }
+            Spacer(Modifier.height(7.dp))
+            AnimatedContent(
+                targetState = shownMonth,
+                transitionSpec = {
+                    if (motion.reduceMotion) {
+                        fadeIn() togetherWith fadeOut()
+                    } else if (direction > 0) {
+                        (slideInHorizontally { it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { -it / 5 } + fadeOut())
+                    } else {
+                        (slideInHorizontally { -it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { it / 5 } + fadeOut())
+                    }
+                },
+                label = "statistics_calendar_month",
+            ) { month ->
+                CalendarMonthGrid(
+                    month = month,
+                    selectedStart = startDate,
+                    selectedEnd = if (mode == CustomDateMode.RANGE) endDate else null,
+                    today = LocalDate.now(),
+                    onSelected = { date ->
+                        onSelectionFeedback()
+                        if (mode == CustomDateMode.SINGLE) {
+                            startDate = date
+                            endDate = date
+                        } else if (!selectingEnd) {
+                            startDate = date
+                            endDate = date
+                            selectingEnd = true
+                        } else {
+                            if (date.isBefore(startDate)) {
+                                endDate = startDate
+                                startDate = date
+                            } else {
+                                endDate = date
+                            }
+                            selectingEnd = false
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DialogAction("取消", onDismiss, Modifier.weight(1f))
+                DialogAction(
+                    "确定",
+                    {
+                        val range = if (mode == CustomDateMode.SINGLE) DateRange(startDate, startDate)
+                        else DateRange(minOf(startDate, endDate), maxOf(startDate, endDate))
+                        onConfirm(range)
+                    },
+                    Modifier.weight(1f),
+                    palette.brand,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CalendarMonthGrid(
     month: YearMonth,
-    selected: LocalDate,
+    selectedStart: LocalDate,
+    selectedEnd: LocalDate?,
     today: LocalDate,
     onSelected: (LocalDate) -> Unit,
 ) {
@@ -208,7 +341,11 @@ private fun CalendarMonthGrid(
             Row(Modifier.fillMaxWidth()) {
                 week.forEach { date ->
                     Box(Modifier.weight(1f).height(42.dp), contentAlignment = Alignment.Center) {
-                        if (date != null) CalendarDay(date, date == selected, date == today) { onSelected(date) }
+                        if (date != null) {
+                            val selected = date == selectedStart || date == selectedEnd
+                            val inRange = selectedEnd != null && !date.isBefore(selectedStart) && !date.isAfter(selectedEnd)
+                            CalendarDay(date, selected, inRange, date == today) { onSelected(date) }
+                        }
                     }
                 }
             }
@@ -217,7 +354,7 @@ private fun CalendarMonthGrid(
 }
 
 @Composable
-private fun CalendarDay(date: LocalDate, selected: Boolean, today: Boolean, onClick: () -> Unit) {
+private fun CalendarDay(date: LocalDate, selected: Boolean, inRange: Boolean, today: Boolean, onClick: () -> Unit) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
     val shape = CircleShape
@@ -232,6 +369,7 @@ private fun CalendarDay(date: LocalDate, selected: Boolean, today: Boolean, onCl
                 when {
                     selected && motion.liquidGlassEnabled -> Brush.radialGradient(listOf(palette.accent.copy(.86f), palette.brand.copy(.94f)))
                     selected -> Brush.radialGradient(listOf(palette.brand, palette.brand))
+                    inRange -> Brush.radialGradient(listOf(palette.brandSoft.copy(.72f), palette.brandSoft.copy(.42f)))
                     else -> Brush.radialGradient(listOf(Color.Transparent, Color.Transparent))
                 },
             )
@@ -316,7 +454,12 @@ private fun DialogAction(
     accent: Color? = null,
 ) {
     val palette = HeimaTheme.palette
-    PressableGlassSurface(onClick, modifier.height(44.dp), 15.dp, backdropBlur = false) {
+    PressableGlassSurface(
+        onClick,
+        modifier.height(44.dp).semantics { contentDescription = "对话框操作：$label" },
+        15.dp,
+        backdropBlur = false,
+    ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(label, color = accent ?: palette.textSecondary, fontWeight = FontWeight.SemiBold)
         }

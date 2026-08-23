@@ -95,6 +95,7 @@ fun RecordSheet(
     onDismiss: () -> Unit,
     onSave: (Transaction) -> Unit,
     onAddCategory: (EntryType) -> Unit,
+    onSelectionFeedback: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -157,6 +158,7 @@ fun RecordSheet(
 
     fun chooseType(newType: EntryType) {
         if (newType == type) return
+        onSelectionFeedback()
         type = newType
         // A type change must never make a classification decision for the user.
         primaryId = null
@@ -272,6 +274,7 @@ fun RecordSheet(
                 LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     items(primaryCategories, key = Category::id) { category ->
                         CategoryChoice(category, category.id == primaryId) {
+                            onSelectionFeedback()
                             if (primaryId != category.id) {
                                 primaryId = category.id
                                 secondaryId = null
@@ -301,6 +304,7 @@ fun RecordSheet(
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             secondaryCategories.forEach { category ->
                                 GlassChip(category.name, secondaryId == category.id, {
+                                    onSelectionFeedback()
                                     secondaryId = if (secondaryId == category.id) null else category.id
                                 })
                             }
@@ -379,6 +383,7 @@ fun RecordSheet(
         LiquidGlassDatePicker(
             initialDate = date,
             onDismiss = { showDatePicker = false },
+            onSelectionFeedback = onSelectionFeedback,
             onConfirm = {
                 date = it
                 showDatePicker = false

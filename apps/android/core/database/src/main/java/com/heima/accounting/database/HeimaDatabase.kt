@@ -64,6 +64,22 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         "occurred_at DESC, id DESC",
     ).use { cursor -> cursor.mapRows(::transactionFromCursor) }
 
+    fun readTransactionsBetween(
+        startEpochMillisInclusive: Long,
+        endEpochMillisExclusive: Long,
+    ): List<Transaction> {
+        require(endEpochMillisExclusive > startEpochMillisInclusive)
+        return readableDatabase.query(
+            "transactions",
+            TRANSACTION_COLUMNS,
+            "occurred_at >= ? AND occurred_at < ?",
+            arrayOf(startEpochMillisInclusive.toString(), endEpochMillisExclusive.toString()),
+            null,
+            null,
+            "occurred_at DESC, id DESC",
+        ).use { cursor -> cursor.mapRows(::transactionFromCursor) }
+    }
+
     fun readBudgets(): List<MonthlyBudget> = readableDatabase.query(
         "monthly_budgets",
         BUDGET_COLUMNS,

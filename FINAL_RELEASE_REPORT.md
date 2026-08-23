@@ -1,74 +1,70 @@
-# 黑马记账 Android 1.0.1 最终发布报告
+# 黑马记账 Android 1.0.2 最终发布报告
 
 ## 发布结论
 
-- ✅ 正式版本：`1.0.1`，版本号 `101`，包名 `com.heima.accounting`。
+- ✅ 正式版本：`1.0.2`，版本号 `102`，包名 `com.heima.accounting`。
+- ✅ 唯一推荐安装文件：`手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
+- ✅ APK 大小：4,829,042 字节；SHA-256：`1270f828c5dc43747e5e1587ca566c657a661ed9c211591691fc7ded69672e01`。
 - ✅ 最低 Android 10（API 29），目标 Android 17（API 37）。
-- ✅ 唯一推荐安装文件：`手机安装包/黑马记账-Android-正式版-1.0.1.apk`。
-- ✅ APK 大小：4,747,122 字节；SHA-256：`d70c691ec974f490e9fad4d491c103a1526a166daedd2be05f584225bef93e77`。
-- ✅ 使用原项目 RSA 4096 位发布密钥和 APK v3 方案签名，可覆盖 1.0.0 并保留账本。
-- ✅ 本轮没有改变数据库结构，也没有删除、重建或伪造用户账单。
-- ⚠️ 这是个人分发、未上架应用商店的版本，手机首次安装可能要求允许“安装未知应用”。
+- ✅ 使用原项目发布密钥和 APK Signature Scheme v3 签名，模拟器覆盖安装成功。
+- ✅ 本轮未改变数据库表结构，不需要 Migration；没有删除、重建或伪造用户账单。
+- ⚠️ 个人分发版本未上架应用商店，手机首次安装可能要求允许“安装未知应用”。
 
-## 本轮最终定型
+## 本轮产品级修正
 
-### 分类与快速记账
+### 独立深浅主题
 
-- ✅ 建立统一 `CategoryIcon`：相同容器、安全区、缩放、裁切、边框、阴影和选中状态。
-- ✅ 将 7×4 分类图集统一去除透明边噪点并按视觉重心居中；原始制作素材移出 APK 资源目录，正式包只携带规范化图集。
-- ✅ 日期和备注统一为同高 54dp 的玻璃输入表面，小屏使用权重布局而非固定像素。
-- ✅ 支出/收入切换只更换一级分类并清除另一类型状态，不再自动展开二级分类。
-- ✅ 点击一级分类后才展开轻量二级 Chip；二级分类始终可选，一级分类可以直接保存。
-- ✅ 分类入口统一为“管理”，与真实进入的分类管理页面一致。
+- ✅ 建立 `AppThemeTokens`，分别管理背景、表面、文字、边框、玻璃、图表和状态颜色。
+- ✅ “澄澈蓝”和“自然治愈”各自拥有独立 Light/Dark Tokens；深色不再是浅色页面叠加黑色滤镜。
+- ✅ Dark Glass 降低白色 Bloom 和大面积高光，改用深灰蓝 Tint、局部边缘高光和更高文字对比。
+- ✅ Glass OFF 使用同主题的普通 Material Surface，布局、层级和功能不改变。
 
-### 自有控件与动效
+### 删除、导航与反馈
 
-- ✅ 删除旧式系统日期弹窗，改为中文 Liquid Glass 日期选择器：星期、月份切换、今天标记、选中 Lens、取消与确定均属于 App 自己的设计系统。
-- ✅ 今日/本周/本月/今年和主题/外观选择共用滑动式 `GlassSegmentedControl`，数据卡随选择轻量过渡。
-- ✅ 底部栏保持连续玻璃结构，中间“记账”以轻微尺寸、强调色和按压回弹成为主操作，不使用巨大悬浮圆球。
-- ✅ 模态记账使用前景 Sheet、中景材质、背景降对比和遮罩；移除全屏实时 RenderEffect，避免 Glass 套 Glass 和多一层全屏 GPU 模糊。
-- ✅ 所有新动画遵守“减少动态效果”；开启后缩短位移、减少弹性和 Morph，功能不变。
+- ✅ 删除提示改为一次性事件和 `SnackbarHostState`：约 4 秒自动消失，可撤销恢复；新删除会结束旧提示，不因重组重新计时。
+- ✅ 首页、统计、预算、我的使用原生 `HorizontalPager` 左右滑动；“记账”仍是主操作，不是 Pager 页面。
+- ✅ 底部连续玻璃 Lens 可点击或按住拖动，松手吸附最近页面；经过“记账”不误弹，停在“记账”才打开快速记账。
+- ✅ Lens、页面、文字选中状态由同一 Pager 状态驱动，避免不同步。
+- ✅ Sound、Haptic、Visual Feedback 三套系统独立；声音使用预加载 `SoundPool`，不为每次点击创建播放器。
 
-### 财务分析与设置
+### 设置单一状态源
 
-- ✅ 首页财务状态来自独立 `FinancialInsightRules`，阈值集中管理，不在 UI 中凭感觉给“良好/一般”。
-- ✅ 规则只读取真实账单，综合账单数量、收入、支出、净现金流、预算、历史同期和分类变化，并解释判断原因。
-- ✅ 数据不足时不评价，只提示继续记录；分析仅描述用户自己的消费和现金流，不构成投资建议。
-- ✅ Liquid Glass、操作音效、触觉反馈、减少动态效果全部使用统一 `GlassToggle`：`true = 右侧蓝色`，`false = 左侧灰色`。
-- ✅ 设置状态、实际功能和本地持久化值保持一致，Activity 重建及 App 重启仍保留。
+- ✅ `SettingsRepository → ViewModel State → UI/Glass/Sound/Haptic` 单向流动。
+- ✅ `liquidGlassEnabled`、`soundEnabled`、`hapticEnabled`、`reduceMotionEnabled` 使用明确正向命名。
+- ✅ Liquid Glass、音效、触觉开启均为右侧强调色；关闭为左侧灰色。“减少动态效果”ON 仍正确表示减少动画。
+- ✅ 四项设置和金额隐私永久保存，Activity 重建及重新启动后仍一致。
 
-## 最终页面与功能
+### 统计与真实数据
 
-1. 首页：日期、星期、农历、每日问候、今日收支、隐私金额、月趋势、预算、规则化财务洞察、分类洞察和最近账单。
-2. 统计：今日/本周/本月/今年，真实收支摘要、环形结构、趋势和分类排行。
-3. 快速记账：自然小数输入、支出/收入、一级快速保存、可选二级细分、自有日期选择器、备注、保存和编辑。
-4. 预算：未设置、设置/修改、已用/剩余、动态进度及真实超预算提示。
-5. 我的：主题色块、系统/浅色/深色、Liquid Glass、音效、触觉、减少动效和视觉质量。
-6. 管理：账单编辑/删除/撤销、自定义分类、CSV、完整备份和事务恢复。
+- ✅ 新增自定义单日/日期区间；使用自有中文 Glass Date Picker，不调用系统旧式日历。
+- ✅ 日期筛选转换为 `startDate/endDateExclusive` 并在 SQLite `WHERE` 中执行，不在 UI 层查询全部后过滤。
+- ✅ 环形图采用 Top 5 + 其他，小于 3% 的细分类优先归并；“其他”可展开完整明细，数据不丢失。
+- ✅ 分类颜色使用稳定映射，并分别适配浅色/深色；点击扇区会突出分类并展示对应真实账单。
+- ✅ 财务分析继续只读取真实账单和预算规则，不生成投资建议或虚假结论。
 
-## 架构与数据安全
+## 最终架构
 
 ```text
-app（页面、状态、交互、自有 Dialog）
-├─ core:designsystem（Theme、Glass、Toggle、Segment、Chip）
-├─ core:domain（金额、分类、统计、FinancialInsightRules）
-├─ core:data（仓库、CSV、备份校验）
-└─ core:database（SQLite、Migration、事务、完整性检查）
+app（页面、HorizontalPager、一次性事件、交互反馈）
+├─ core:designsystem（独立主题 Tokens、Glass 与降级组件）
+├─ core:domain（金额、日期范围、Top5+其他、财务洞察）
+├─ core:data（SettingsRepository、仓库、CSV、备份）
+└─ core:database（SQLite、范围查询、事务、完整性检查）
 ```
 
-- 金额继续以整数“分”保存。
-- SQLite 继续启用外键、WAL、索引和 `quick_check`；无法打开时不自动删除原文件。
-- 完整恢复先校验并建立恢复前副本，再在单个事务中替换；失败回滚。
+- 金额仍以整数“分”保存。
+- SQLite 保持外键、WAL、索引、事务和完整性检查。
 - App 不需要账号，也不申请网络、定位、通讯录、相机或麦克风权限。
 
-## 验收结果
+## 最终验收
 
-- ✅ 23 项 JVM 单元/数据测试全部通过。
-- ✅ 21 项 Android 模拟器数据库/UI 交互测试全部通过。
-- ✅ Release Lint：0 error、0 warning、0 hint。
-- ✅ R8、资源收缩、zipalign、v3 签名、覆盖安装、版本检查和正式包启动冒烟均通过。
-- ✅ Light/Dark、Liquid Glass ON/OFF、首页、统计、预算、我的、设置、记账、二级分类和日期选择器已逐屏检查。
-- ⚠️ 本轮性能采集时模拟器自身出现 `System UI isn't responding`，且 ON/OFF 均返回固定错误 GPU 值 `4950ms`；这些 FPS/Jank 数据已标为无效，没有冒充真机结果。详见 `PERFORMANCE_REPORT.md`。
-- ⚠️ 真机电池、温升、120Hz 和不同厂商系统仍需在用户手机上验收。
+- ✅ Release Lint：`No issues found`。
+- ✅ JVM 单元/规则测试：26/26 通过。
+- ✅ Android 16 模拟器数据库/UI/手势/截图测试：30/30 通过。
+- ✅ 100、1000、10000 条账单替换与读回通过。
+- ✅ R8 Release、资源压缩、zipalign、v3 签名、版本识别、覆盖安装和冷启动冒烟通过。
+- ✅ 正式包冷启动采样：622ms；启动后进程存活，日志窗口无 App FATAL/ANR。
+- ⚠️ 模拟器高压采样中，Glass ON 的底栏拖动 Jank 为 9.66%，快速记账开关为 15.71%；这不是 120Hz 真机结论，详见 `PERFORMANCE_REPORT.md`。
+- ⚠️ 真实手机扬声器音色、触觉手感、耗电、温升和 90/120Hz 表现仍为 `NEEDS REAL DEVICE VERIFICATION`。
 
-详细测试见 `TEST_REPORT.md`，性能见 `PERFORMANCE_REPORT.md`，许可证见 `THIRD_PARTY_NOTICES.md`。
+详细结果见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。

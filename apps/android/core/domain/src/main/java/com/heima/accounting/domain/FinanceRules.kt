@@ -9,6 +9,8 @@ import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 
 object FinanceRules {
+    const val MAX_VISIBLE_CATEGORIES = 5
+    const val SMALL_CATEGORY_RATIO = 0.03f
     fun parseYuanToCents(input: String): Long? {
         val normalized = input.trim().trimEnd('.')
         if (!normalized.matches(Regex("\\d{1,9}(\\.\\d{1,2})?"))) return null
@@ -74,6 +76,36 @@ object FinanceRules {
     }
 
     fun monthKey(date: LocalDate): String = "%04d-%02d".format(date.year, date.monthValue)
+
+    /** Keeps a mobile donut legible while preserving every category in Other. */
+    fun categoryChartSlices(
+        totals: List<CategoryTotal>,
+        maxVisible: Int = MAX_VISIBLE_CATEGORIES,
+        smallRatio: Float = SMALL_CATEGORY_RATIO,
+    ): List<CategoryChartSlice> {
+        require(maxVisible > 0)
+        val sorted = totals.sortedByDescending(CategoryTotal::amountCents)
+        val visible = mutableListOf<CategoryTotal>()
+        val other = mutableListOf<CategoryTotal>()
+        sorted.forEach { total ->
+            if (visible.size < maxVisible && total.ratio >= smallRatio) visible += total else other += total
+        }
+        return buildList {
+            visible.forEach { total ->
+                add(CategoryChartSlice(total.categoryId, total.amountCents, total.ratio, setOf(total.categoryId)))
+            }
+            if (other.isNotEmpty()) {
+                add(
+                    CategoryChartSlice(
+                        categoryId = null,
+                        amountCents = other.sumOf(CategoryTotal::amountCents),
+                        ratio = other.sumOf { it.ratio.toDouble() }.toFloat(),
+                        sourceCategoryIds = other.mapTo(linkedSetOf(), CategoryTotal::categoryId),
+                    ),
+                )
+            }
+        }
+    }
 
 }
 

@@ -114,7 +114,7 @@ fun ProfileScreen(
                 }
             }
         }
-        item { Text("黑马记账 1.0.1", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
+        item { Text("黑马记账 1.0.2", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
     }
 }
 

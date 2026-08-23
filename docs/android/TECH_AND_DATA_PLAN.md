@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | Kotlin | Android 原生编程语言 | 业务、状态和数据规则 |
 | Jetpack Compose | 用代码搭建手机界面 | 页面、主题、Glass 和动画 |
-| SQLiteOpenHelper | 手机里的本地电子账本 | 迁移、分类、账单、预算和设置 |
+| SQLiteOpenHelper | 手机里的本地电子账本 | 迁移、分类、账单和预算 |
+| SettingsRepository + SharedPreferences | 本机体验设置柜 | 主题、Glass、音效、触觉、动效和金额隐私的单一状态源 |
 | ViewModel + Flow | 页面数据管理员 | 后台读写后把最新数据送回页面 |
 | Coroutines | 不堵住界面的任务管道 | 数据库、导入和导出 |
 | Kyant Backdrop | 局部背景采样和玻璃 Lens | 底栏与重要交互表面 |
@@ -21,7 +22,7 @@ app
 ├─ UI / ViewModel / InteractionFeedback
 ├─ core:designsystem  主题、Glass、Motion
 ├─ core:domain        模型、金额规则、默认分类
-├─ core:data          Repository、CSV、备份校验
+├─ core:data          Repository、设置状态、CSV、备份校验
 └─ core:database      SQLite、Migration、事务、quick_check
 ```
 
@@ -34,6 +35,7 @@ app
 - 二级分类必须属于正确的一级分类并匹配收支类型。
 - 有历史账目的自定义分类只停用，不破坏旧账单关系。
 - 预算按月份保存。
+- 体验设置采用正向语义并由 `SettingsRepository` 单向流向 ViewModel 和 UI。
 - 默认只建立分类和设置，不建立虚假账单。
 
 ## 数据库安全

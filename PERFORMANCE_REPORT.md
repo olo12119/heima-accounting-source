@@ -1,85 +1,67 @@
-# 黑马记账 Android 1.0.1 性能报告
+# 黑马记账 Android 1.0.2 性能报告
 
-## 测试环境与诚实结论
+## 测试环境
 
-- 设备：Android Studio AVD `Heima_Android_16`
-- 系统：Android 16 / API 36
-- 分辨率：1080 × 2400，60Hz
-- 图形：Android Emulator OpenGL ES Translator / NVIDIA RTX 4060
-- 构建：1.0.1 Debug 用于自动交互，R8 Release 用于最终启动冒烟
+- Android Studio AVD：`Heima_Android_16`
+- Android 16 / API 36，1080×2400，模拟 60Hz
+- Debug：自动手势和 `dumpsys gfxinfo`；R8 Release：最终冷启动与冒烟
+- 采样脚本：`measure-tab-performance.ps1`、`measure-record-sheet-performance.ps1`、`measure-navigation-drag-performance.ps1`
 
-本轮确实执行了 Liquid Glass ON/OFF、记账 Sheet、普通 Tab、启动、CPU、GPU 和内存采集。但采集期间模拟器弹出 `System UI isn't responding`；重启虚拟系统后，系统仍在所有场景把 GPU P50/P90/P95/P99 固定报告为不可能的 `4950ms`。因此：
+模拟器适合发现趋势，不代表真实手机 GPU、120Hz、耗电或温升。本报告保留所有有效高压结果，不以“肉眼流畅”代替数据。
 
-- ⚠️ FPS：`NOT VALID`，不能从异常模拟器数据计算。
-- ⚠️ Jank：`NOT VALID`，系统 UI 自身 ANR，ON/OFF 和普通 Tab 均同样异常。
-- ⚠️ GPU 帧时间：`NOT VALID`，固定 `4950ms` 是损坏数据。
-- ⚠️ 启动性能基线：`NOT VALID`，系统 UI 异常时冷启动为 2.6～3.0 秒。
-- ✅ 功能交互仍完成 21/21 自动化测试，无 App FATAL/ANR。
+## 有效采样
 
-没有用这些失真的高卡顿数字宣称 App 性能变差，也没有用旧数字冒充本轮结果。
+| 场景 | Glass | 总帧 | 现代 Jank | P50/P90/P95/P99 | GPU P50/P90/P95 | 总 PSS |
+| --- | --- | ---: | ---: | --- | --- | ---: |
+| 快速记账打开/关闭 12 次 | ON | 312 | 49（15.71%） | 19/48/77/117ms | 16/20/24ms | 112,518 KB |
+| 快速记账打开/关闭 12 次 | OFF | 307 | 42（13.68%） | 18/48/77/133ms | 15/19/20ms | 106,541 KB |
+| 底栏 Lens 拖动与吸附 8 轮 | ON | 497 | 48（9.66%） | 22/42/53/150ms | 16/21/23ms | 123,124 KB |
+| 底栏 Lens 拖动与吸附 8 轮 | OFF | 486 | 44（9.05%） | 18/31/38/101ms | 15/19/21ms | 106,180 KB |
 
-## 本轮原始异常样本
+说明：
 
-| 场景 | 帧 | 系统报告 Jank | GPU 分位数 | 瞬时 CPU | 总 PSS / RSS |
-| --- | ---: | ---: | --- | ---: | --- |
-| 记账 Sheet 12 次，Glass ON | 136 | 129（94.85%） | 4950/4950/4950/4950ms（无效） | 0%（结束后瞬时） | 100,560 / 216,472 KB |
-| 记账 Sheet 12 次，Glass OFF | 111 | 106（95.50%） | 4950/4950/4950/4950ms（无效） | 0%（结束后瞬时） | 104,513 / 220,152 KB |
-| 普通 Tab，低频操作 | 109 | 106（97.25%） | 4950/4950/4950/4950ms（无效） | 未单独采样 | 未单独采样 |
+- `dumpsys` 在拖动样本的 GPU P99 返回 4950ms 哨兵异常值，因此表中不采用 P99；P50/P90/P95 正常可用。
+- 压力脚本连续操作，间隔短于普通用户使用节奏，数值用于版本回归而非承诺帧率。
+- Glass OFF 的中位帧时间和内存均较低，证明关闭开关确实降低材质成本，而不是视觉反转。
+- Glass ON 的高压 Jank 仍未达到理想目标，必须在主力真机上继续验收；功能层面可随时关闭 Glass。
 
-Glass OFF 并没有改善异常数字，普通 Tab 也同样异常；结合系统 UI ANR，可以确认这组数据不能用于 ON/OFF 产品比较。内存是当时进程快照，不代表峰值或长期平均；CPU 只是压力结束后的瞬时值。
+## 启动、CPU 与内存
 
-## 仍然完成的代码性能修正
+- ✅ 1.0.2 R8 正式包覆盖安装后的冷启动：622ms。
+- ✅ Debug 高压脚本冷启动样本：716～854ms。
+- ✅ 压力结束后的瞬时 CPU 样本为 0～0.1%；这只表示静止后 CPU 已回落，不代表动画峰值。
+- ✅ App 没有网络轮询、后台服务、常驻 Timer 或无限图表动画；进入后台后 Compose 动画不再持续绘制。
+- ✅ 100、1000、10000 条账单数据库替换与读回通过。
 
-- ✅ 分类 3D 图集在 App 层只解码一次，不为每个分类重复解码整图。
-- ✅ 图标预处理统一裁掉透明噪点并只把正式图集放进 APK；旧 1.59MB 源图移到工具目录，不再重复打包。
-- ✅ 记账 Sheet 自身使用一块足够不透明的模态材质，数字按键和分类不再层层执行实时 Backdrop。
-- ✅ 删除 Sheet 移动期间的全屏 `RenderEffect` Blur，改为背景降对比 + 单层 Dim；视觉回归确认仍无文字穿透。
-- ✅ 统计计算使用 `Dispatchers.Default`，不让数据库汇总卡住选中 Lens 动画。
-- ✅ 动画只在数据变化时播放；没有常驻 Timer、网络轮询、后台服务或无限图表动画。
-- ✅ Reduced Motion、系统省电和 Liquid Glass OFF 都能降低动画/材质成本，布局和功能不变。
-- ✅ R8 代码压缩和资源收缩后，APK 从 1.0.0 的 5,238,642 字节降为 4,747,122 字节。
+## 已完成的性能约束
 
-## 历史可用基线（仅供对照，不是 1.0.1 复测）
-
-在模拟器图形统计尚正常的 1.0.0 测试中曾取得：
-
-| 旧版本场景 | Glass | 总帧 | Jank | GPU P50/P90/P95/P99 |
-| --- | --- | ---: | ---: | --- |
-| 连续 Tab 切换 | 开 | 756 | 21（2.78%） | 17/21/22/24ms |
-| 连续 Tab 切换 | 关 | 738 | 5（0.68%） | 17/21/22/24ms |
-| 首页滚动 | 开 | 541 | 2（0.37%） | 17/20/21/24ms |
-
-这些数字只证明此前同一 AVD 曾能正确输出合理 GPU 时间；不能替代 1.0.1 真机复测。
+- 主题、Glass、Sound、Haptic 由单一 StateFlow 驱动，避免 UI 与引擎重复状态和无效重组。
+- Pager 使用官方 `HorizontalPager`；记账不作为隐藏页面参与 Pager 预组合。
+- Bottom Lens 只维护单一动画位置，拖动跨过“记账”不会创建 Sheet。
+- 统计日期范围直接在 SQLite 查询，避免先读取全部账单再在 UI 过滤。
+- Donut 默认最多 6 个扇区，避免分类增多后大量 Path、颜色和图例。
+- SoundPool 一次预加载，点击不重复创建 MediaPlayer。
+- Glass OFF、Reduced Motion、系统省电和视觉质量可降低材质与动画成本。
+- R8 和资源收缩启用；正式 APK 为 4,829,042 字节。
 
 ## 工具覆盖
 
 | 方法 | 状态 |
 | --- | --- |
-| `dumpsys gfxinfo` | ⚠️ 已执行，但本轮结果因系统 UI ANR 无效 |
-| `dumpsys meminfo` / `cpuinfo` | ✅ 已采集进程快照 |
-| `am start -W` | ⚠️ 已执行，但本轮启动时间不构成有效基线 |
-| 21 项模拟器功能/UI 测试 | ✅ 全部通过 |
-| Android Studio Profiler | ⚠️ `NOT TESTED` |
-| Perfetto Trace | ⚠️ `NOT TESTED` |
-| Macrobenchmark | ⚠️ `NOT IMPLEMENTED` |
-| JankStats | ⚠️ `NOT IMPLEMENTED` |
-| 自定义 Baseline Profile | ⚠️ `NOT GENERATED` |
+| `dumpsys gfxinfo` | ✅ ON/OFF、Sheet、Tab、Lens Drag 已采样 |
+| `dumpsys meminfo` / `cpuinfo` | ✅ 已采样进程快照 |
+| `am start -W` | ✅ Release 冷启动 622ms |
+| 30 项模拟器 UI/手势/截图测试 | ✅ 全部通过 |
+| 100/1000/10000 数据库测试 | ✅ 通过 |
+| Android Studio Profiler | ⚠️ NOT TESTED |
+| Perfetto 长时间 Trace | ⚠️ NOT TESTED |
+| 独立 Macrobenchmark 模块 | ⚠️ NOT IMPLEMENTED |
+| 真机电池/温度/120Hz | ⚠️ NEEDS REAL DEVICE VERIFICATION |
 
-## 大数据量、功耗与温度
+## 真机复测建议
 
-- ✅ 100、1000、10000 条账单的事务替换与读回通过。
-- ⚠️ 大数据滚动 FPS：`NOT VALID`，本轮模拟器图形统计异常。
-- ⚠️ 真机电量/小时：`NOT TESTED`。
-- ⚠️ 真机温升与 Thermal Throttling：`NOT TESTED`。
-- ⚠️ 真机 60/90/120Hz：`NOT TESTED`。
-
-模拟器电池和温度不能代表用户手机，因此没有编造数字。
-
-## 推荐真机复测
-
-1. 安装 `手机安装包/黑马记账-Android-正式版-1.0.1.apk`。
-2. 分别在 Liquid Glass ON/OFF 下连续切换 5 个页面 20 次。
-3. 连续打开、拖动、关闭记账 Sheet 20 次。
-4. 导入或建立 1000 条账单，检查首页、统计和账单滚动。
-5. 连接 Android Studio Profiler/Perfetto，记录至少 5 分钟 CPU、内存、帧、GPU 和温度。
-6. 再用系统电池页观察 30 分钟真实耗电；若主力手机掉帧，优先将视觉质量设为“自动”或关闭 Liquid Glass，账本功能不受影响。
+1. 安装 `手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
+2. 分别在 Glass ON/OFF 下拖动底栏、切页和打开记账面板各 20 次。
+3. 用 Android Studio Profiler 或 Perfetto 记录 5 分钟 CPU、内存和帧时间。
+4. 导入 1000 条账单后检查首页、统计和账单滚动。
+5. 用系统电池页观察至少 30 分钟；若主力手机掉帧，先选“自动”或关闭 Liquid Glass，账本功能不受影响。

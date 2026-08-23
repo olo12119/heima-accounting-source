@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,13 +32,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.HeimaTheme
-import com.heima.accounting.domain.CategoryTotal
+import com.heima.accounting.domain.CategoryChartSlice
 import com.heima.accounting.domain.DailyTotal
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.LedgerSnapshot
@@ -48,6 +50,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.max
+import kotlin.math.atan2
+import kotlin.math.hypot
 
 @Composable
 fun SensitiveAmountText(
@@ -133,33 +137,83 @@ fun AnimatedTrendChart(
 
 @Composable
 fun AnimatedDonutChart(
-    totals: List<CategoryTotal>,
-    snapshot: LedgerSnapshot,
+    slices: List<CategoryChartSlice>,
+    colors: List<Color>,
+    selectedIndex: Int?,
+    onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    centerLabel: String,
+    centerTitle: String,
+    centerSubtitle: String,
 ) {
     val palette = HeimaTheme.palette
     val reduceMotion = HeimaTheme.motion.reduceMotion
-    val key = remember(totals) { totals.hashCode() }
+    val key = remember(slices) { slices.hashCode() }
     val progress = remember(key) { Animatable(if (reduceMotion) 1f else 0f) }
     LaunchedEffect(key, reduceMotion) {
         if (!reduceMotion) progress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
         else progress.snapTo(1f)
     }
     Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.matchParentSize()) {
+        Canvas(
+            Modifier
+                .matchParentSize()
+                .semantics { contentDescription = "可交互的收支分类环形图" }
+                .pointerInput(slices) {
+                    detectTapGestures { tap ->
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val radius = hypot(tap.x - centerX, tap.y - centerY)
+                        val outer = minOf(size.width, size.height) / 2f
+                        if (radius !in outer * .54f..outer) return@detectTapGestures
+                        val degrees = Math.toDegrees(
+                            atan2(tap.y - centerY, tap.x - centerX).toDouble(),
+                        ).toFloat()
+                        val clockwiseFromTop = (degrees + 450f) % 360f
+                        var cursor = 0f
+                        slices.forEachIndexed { index, slice ->
+                            val end = cursor + 360f * slice.ratio
+                            if (clockwiseFromTop in cursor..end) {
+                                onSelected(index)
+                                return@detectTapGestures
+                            }
+                            cursor = end
+                        }
+                    }
+                },
+        ) {
             val stroke = 16.dp.toPx()
             drawCircle(palette.surfaceMuted, style = Stroke(stroke))
             var start = -90f
-            totals.take(8).forEach { total ->
-                val category = snapshot.category(total.categoryId)
-                val color = category?.colorArgb?.let(::Color) ?: palette.brand
-                val sweep = 360f * total.ratio * progress.value
-                drawArc(color, start, sweep.coerceAtLeast(0f), false, style = Stroke(stroke, cap = StrokeCap.Round))
+            slices.forEachIndexed { index, slice ->
+                val color = colors.getOrElse(index) { palette.brand }
+                val sweep = 360f * slice.ratio * progress.value
+                val selected = selectedIndex == index
+                drawArc(
+                    color = color,
+                    startAngle = start + if (selected) .8f else 1.2f,
+                    sweepAngle = (sweep - if (selected) 1.6f else 2.4f).coerceAtLeast(0f),
+                    useCenter = false,
+                    style = Stroke(
+                        width = if (selected) 20.dp.toPx() else stroke,
+                        cap = StrokeCap.Round,
+                    ),
+                )
                 start += sweep
             }
         }
-        Text(centerLabel, color = palette.textPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                centerTitle,
+                color = palette.textPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                centerSubtitle,
+                color = palette.textSecondary,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
     }
 }
 

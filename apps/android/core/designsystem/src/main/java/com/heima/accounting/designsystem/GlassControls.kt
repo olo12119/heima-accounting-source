@@ -2,12 +2,14 @@ package com.heima.accounting.designsystem
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
@@ -100,6 +103,12 @@ fun <T> GlassSegmentedControl(
             options.forEach { (value, label) ->
                 val isSelected = value == selected
                 val interaction = remember(value) { MutableInteractionSource() }
+                val pressed by interaction.collectIsPressedAsState()
+                val pressScale by animateFloatAsState(
+                    targetValue = if (pressed && !motion.reduceMotion) .97f else 1f,
+                    animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .88f, stiffness = 760f),
+                    label = "glass_segment_press",
+                )
                 val color by animateColorAsState(
                     if (isSelected) palette.brand else palette.textSecondary,
                     animationSpec = tween(if (motion.reduceMotion) 70 else 170),
@@ -109,6 +118,7 @@ fun <T> GlassSegmentedControl(
                     Modifier
                         .weight(1f)
                         .fillMaxSize()
+                        .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                         .semantics {
                             contentDescription = "$accessibilityLabel：$label"
                             stateDescription = if (isSelected) "已选中" else "未选中"
@@ -184,10 +194,18 @@ fun GlassToggle(
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
-                        listOf(Color.White, if (checked) Color(0xFFEAF2FF) else palette.glassBottom),
+                        if (motion.darkTheme) {
+                            listOf(palette.textSecondary, palette.surfaceElevated)
+                        } else {
+                            listOf(Color.White, if (checked) Color(0xFFEAF2FF) else palette.glassBottom)
+                        },
                     ),
                 )
-                .border(1.dp, Color.White.copy(alpha = .72f), CircleShape),
+                .border(
+                    1.dp,
+                    if (motion.darkTheme) palette.glassOutline.copy(alpha = .42f) else Color.White.copy(alpha = .72f),
+                    CircleShape,
+                ),
         )
     }
 }
@@ -203,6 +221,12 @@ fun GlassChip(
     val motion = HeimaTheme.motion
     val shape = RoundedCornerShape(14.dp)
     val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && !motion.reduceMotion) .97f else 1f,
+        animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .88f, stiffness = 760f),
+        label = "glass_chip_press",
+    )
     Box(
         modifier
             .semantics {
@@ -215,6 +239,7 @@ fun GlassChip(
                 else palette.surfaceMuted.copy(alpha = if (motion.darkTheme) .74f else .66f),
             )
             .border(1.dp, if (selected) palette.brand.copy(.46f) else palette.divider, shape)
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 13.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
