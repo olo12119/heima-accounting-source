@@ -75,7 +75,43 @@ object FinanceRules {
         return FinanceSummary(expenseTotal, income.sumOf(Transaction::amountCents), categories, daily)
     }
 
+    /**
+     * Builds an honest day-by-day series without inventing transactions. Empty
+     * days are represented by zero, while a completely empty ledger remains an
+     * empty state. Callers choose the end date, so home can stop at today instead
+     * of drawing future days from the rest of the month.
+     */
+    fun continuousDailyTotals(
+        totals: List<DailyTotal>,
+        range: DateRange,
+    ): List<DailyTotal> {
+        if (totals.isEmpty()) return emptyList()
+        val byDate = totals.associateBy(DailyTotal::date)
+        return buildList {
+            var date = range.startInclusive
+            while (!date.isAfter(range.endInclusive)) {
+                add(byDate[date] ?: DailyTotal(date, expenseCents = 0L, incomeCents = 0L))
+                date = date.plusDays(1)
+            }
+        }
+    }
+
     fun monthKey(date: LocalDate): String = "%04d-%02d".format(date.year, date.monthValue)
+
+    /** Validation shared by the custom statistics picker and its confirm path. */
+    fun historicalRangeOrNull(
+        startInclusive: LocalDate,
+        endInclusive: LocalDate,
+        today: LocalDate,
+    ): DateRange? = if (
+        startInclusive.isAfter(today) ||
+        endInclusive.isAfter(today) ||
+        endInclusive.isBefore(startInclusive)
+    ) {
+        null
+    } else {
+        DateRange(startInclusive, endInclusive)
+    }
 
     /** Keeps a mobile donut legible while preserving every category in Other. */
     fun categoryChartSlices(

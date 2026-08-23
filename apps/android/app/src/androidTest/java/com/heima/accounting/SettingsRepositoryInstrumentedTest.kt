@@ -45,4 +45,17 @@ class SettingsRepositoryInstrumentedTest {
         assertEquals(HeimaColorMode.DARK, restored.colorMode)
         assertEquals(VisualQuality.POWER_SAVER, restored.visualQuality)
     }
+
+    @Test
+    fun liquidGlassCanBeDisabledWithoutChangingTheOtherExperienceDefaults() {
+        SettingsRepository(context).setLiquidGlassEnabled(false)
+
+        val restored = SettingsRepository(context).state.value
+        assertFalse(restored.liquidGlassEnabled)
+        assertTrue(restored.soundEnabled)
+        assertTrue(restored.hapticEnabled)
+        assertFalse(restored.reduceMotionEnabled)
+        assertEquals(HeimaColorMode.SYSTEM, restored.colorMode)
+        assertEquals(VisualQuality.AUTO, restored.visualQuality)
+    }
 }

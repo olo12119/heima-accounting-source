@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -117,21 +118,46 @@ fun AnimatedTrendChart(
             Offset(x, y)
         }
         val visibleX = size.width * progress.value
+        val visiblePoints = points.filter { it.x <= visibleX + .5f }
+        if (visiblePoints.isEmpty()) return@Canvas
+        val lineColor = if (showIncome) palette.income else palette.brand
+        if (visiblePoints.size == 1) {
+            val point = visiblePoints.first()
+            drawCircle(lineColor.copy(alpha = .15f), radius = 8.dp.toPx(), center = point)
+            drawCircle(lineColor, radius = 3.5.dp.toPx(), center = point)
+            return@Canvas
+        }
         val path = Path()
-        points.forEachIndexed { index, point ->
-            if (point.x <= visibleX) {
-                if (index == 0) path.moveTo(point.x, point.y) else {
-                    val previous = points[index - 1]
-                    val midX = (previous.x + point.x) / 2f
-                    path.cubicTo(midX, previous.y, midX, point.y, point.x, point.y)
-                }
+        visiblePoints.forEachIndexed { index, point ->
+            if (index == 0) path.moveTo(point.x, point.y) else {
+                val previous = visiblePoints[index - 1]
+                val midX = (previous.x + point.x) / 2f
+                path.cubicTo(midX, previous.y, midX, point.y, point.x, point.y)
             }
         }
+        val area = Path().apply {
+            addPath(path)
+            lineTo(visiblePoints.last().x, baselineY)
+            lineTo(visiblePoints.first().x, baselineY)
+            close()
+        }
+        drawPath(
+            path = area,
+            brush = Brush.verticalGradient(
+                listOf(lineColor.copy(alpha = .18f), lineColor.copy(alpha = .015f)),
+                endY = baselineY,
+            ),
+        )
         drawPath(
             path,
-            color = if (showIncome) palette.income else palette.brand,
+            color = lineColor,
             style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
         )
+        if (progress.value >= .99f) {
+            val latest = points.last()
+            drawCircle(lineColor.copy(alpha = .14f), radius = 7.dp.toPx(), center = latest)
+            drawCircle(lineColor, radius = 3.dp.toPx(), center = latest)
+        }
     }
 }
 

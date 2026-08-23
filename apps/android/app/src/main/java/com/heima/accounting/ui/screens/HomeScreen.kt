@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,6 +56,7 @@ fun HomeScreen(
     amountsVisible: Boolean,
     onAmountsVisibleChange: (Boolean) -> Unit,
     onRecord: () -> Unit,
+    onBudgetClick: () -> Unit,
     onOpenRecords: () -> Unit,
     onTransactionClick: (Long) -> Unit,
 ) {
@@ -67,6 +69,12 @@ fun HomeScreen(
     }
     val monthSummary = remember(snapshot.transactions, today) {
         FinanceRules.summarize(snapshot.transactions, FinanceRules.range(StatisticsPeriod.MONTH, today))
+    }
+    val monthTrend = remember(monthSummary.dailyTotals, today) {
+        FinanceRules.continuousDailyTotals(
+            monthSummary.dailyTotals,
+            com.heima.accounting.domain.DateRange(today.withDayOfMonth(1), today),
+        )
     }
     val budget = snapshot.budgets.firstOrNull { it.month == FinanceRules.monthKey(today) }
     val remainingBudget = budget?.let { (it.amountCents - monthSummary.expenseCents).coerceAtLeast(0L) }
@@ -81,8 +89,10 @@ fun HomeScreen(
         FinancialInsightLevel.HIGH_PRESSURE -> palette.expense
     }
 
+    val listState = rememberLazyListState()
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -120,12 +130,20 @@ fun HomeScreen(
                     Column(Modifier.padding(17.dp)) {
                         Text("本月趋势", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(10.dp))
-                        AnimatedTrendChart(monthSummary.dailyTotals, Modifier.fillMaxWidth().height(56.dp))
+                        AnimatedTrendChart(monthTrend, Modifier.fillMaxWidth().height(56.dp))
                         Spacer(Modifier.height(6.dp))
                         Text(if (monthSummary.expenseCents == 0L) "等待第一笔账" else "本月 ${monthSummary.expenseCents.formatYuan()}", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                     }
                 }
-                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = true) {
+                PressableGlassSurface(
+                    onClick = onBudgetClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(150.dp)
+                        .semantics { contentDescription = "查看本月预算" },
+                    cornerRadius = 26.dp,
+                    backdropBlur = true,
+                ) {
                     Box(Modifier.matchParentSize().padding(17.dp)) {
                         Column {
                             Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)

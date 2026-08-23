@@ -3,7 +3,11 @@ package com.heima.accounting.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -11,6 +15,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -21,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import com.heima.accounting.MainActivity
+import androidx.test.espresso.Espresso.pressBack
 import java.time.LocalDate
 import org.junit.Before
 import org.junit.Rule
@@ -75,26 +84,50 @@ class NavigationAndRecordTest {
 
     @Test
     fun draggingBottomLensSnapsToTabsAndDoesNotOpenRecordWhilePassingIt() {
-        composeRule.onNodeWithContentDescription("底部导航选中镜片，可左右拖动").performTouchInput {
+        composeRule.onNodeWithContentDescription("底部导航，可直接左右拖动").performTouchInput {
             swipe(
-                start = center,
-                end = Offset(center.x + visibleSize.width * 1.15f, center.y),
-                durationMillis = 500,
+                start = Offset(visibleSize.width * .10f, center.y),
+                end = Offset(visibleSize.width * .22f, center.y),
+                durationMillis = 420,
             )
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("读懂每一笔真实收支").assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("底部导航选中镜片，可左右拖动").performTouchInput {
+        composeRule.onNodeWithContentDescription("底部导航，可直接左右拖动").performTouchInput {
             swipe(
-                start = center,
-                end = Offset(center.x + visibleSize.width * 2.15f, center.y),
-                durationMillis = 650,
+                start = Offset(visibleSize.width * .30f, center.y),
+                end = Offset(visibleSize.width * .72f, center.y),
+                durationMillis = 680,
             )
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("给生活留一点从容").assertIsDisplayed()
         assertTrue(composeRule.onAllNodesWithText("清空", substring = false).fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
+    fun bottomBarDirectDragUsesTouchSlopWithoutLongPressAndTracksDistance() {
+        val navigation = composeRule.onNodeWithContentDescription("底部导航，可直接左右拖动")
+        navigation.performTouchInput {
+            swipe(
+                start = Offset(visibleSize.width * .10f, center.y),
+                end = Offset(visibleSize.width * .14f, center.y),
+                durationMillis = 450,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("今日消费").assertIsDisplayed()
+
+        navigation.performTouchInput {
+            swipe(
+                start = Offset(visibleSize.width * .10f, center.y),
+                end = Offset(visibleSize.width * .23f, center.y),
+                durationMillis = 430,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("读懂每一笔真实收支").assertIsDisplayed()
     }
 
     @Test
@@ -189,10 +222,11 @@ class NavigationAndRecordTest {
     @Test
     fun statisticsPeriodSelectionHasOnePersistentSelectedState() {
         composeRule.onNodeWithContentDescription("打开统计").performClick()
-        composeRule.onNodeWithContentDescription("统计时间范围：本周").performClick()
-        composeRule.onNodeWithContentDescription("统计时间范围：本周").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("统计时间范围：本月").performClick()
-        composeRule.onNodeWithContentDescription("统计时间范围：本月").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("统计时间范围：今日").assertIsSelected()
+        composeRule.onNodeWithContentDescription("统计时间范围：本周").performClick().assertIsSelected()
+        composeRule.onNodeWithContentDescription("打开预算").performClick()
+        composeRule.onNodeWithContentDescription("打开统计").performClick()
+        composeRule.onNodeWithContentDescription("统计时间范围：本周").assertIsSelected()
     }
 
     @Test
@@ -325,7 +359,73 @@ class NavigationAndRecordTest {
         composeRule.onNodeWithText("自定义：", substring = true).assertIsDisplayed()
 
         composeRule.onNodeWithText("重置", substring = false).performClick()
-        composeRule.onNodeWithContentDescription("统计时间范围：本月").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("统计时间范围：今日").assertIsSelected()
+    }
+
+    @Test
+    fun statisticsCustomDateDisablesFutureDaysAndFutureMonthNavigation() {
+        val tomorrow = LocalDate.now().plusDays(1)
+        composeRule.onNodeWithContentDescription("打开统计").performClick()
+        composeRule.onNodeWithContentDescription("自定义统计日期").performClick()
+        composeRule.onNodeWithContentDescription("下一个月").assertIsNotEnabled()
+        if (tomorrow.month == LocalDate.now().month) {
+            composeRule
+                .onNodeWithContentDescription("${tomorrow.monthValue}月${tomorrow.dayOfMonth}日", substring = true)
+                .assertIsNotEnabled()
+        }
+    }
+
+    @Test
+    fun homeBudgetCardOpensTheBudgetPageDirectly() {
+        composeRule.onNodeWithContentDescription("查看本月预算").performClick()
+        composeRule.onNodeWithText("给生活留一点从容").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("打开预算").assertIsSelected()
+    }
+
+    @Test
+    fun firstExpenseOfTheMonthProducesAVisibleContinuousTrend() {
+        saveOneExpense()
+        composeRule.onNodeWithContentDescription("消费趋势图，共${LocalDate.now().dayOfMonth}天数据").assertIsDisplayed()
+    }
+
+    @Test
+    fun categoryManagementAllFilterAndEditorWorkAndBackRestoresProfilePosition() {
+        val categoryName = "测试分类${System.nanoTime().toString().takeLast(5)}"
+        val editedName = "编辑后${categoryName.takeLast(5)}"
+        composeRule.onNodeWithContentDescription("打开我的").performClick()
+        composeRule.onRoot().performTouchInput { swipeUp() }
+        composeRule.onRoot().performTouchInput { swipeUp() }
+        composeRule.onNodeWithText("分类管理", substring = false).performClick()
+        composeRule.onNodeWithContentDescription("账单类型筛选：全部").assertIsSelected()
+        composeRule.onNodeWithText("支出分类", substring = false).assertIsDisplayed()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("收入分类"))
+        composeRule.onNodeWithText("收入分类", substring = false).assertIsDisplayed()
+
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("添加一级分类"))
+        composeRule.onNodeWithText("添加一级分类", substring = false).performClick()
+        composeRule.onNodeWithContentDescription("分类名称").performTextInput(categoryName)
+        composeRule.onNodeWithContentDescription("分类图标：餐饮").performClick()
+        composeRule.onNodeWithText("保存", substring = false).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(categoryName, substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText(categoryName, substring = false).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("编辑$categoryName").performClick()
+        composeRule.onNodeWithContentDescription("分类名称").performTextReplacement(editedName)
+        composeRule.onNodeWithContentDescription("选择分类颜色 ffe97868").performClick()
+        composeRule.onNodeWithText("保存", substring = false).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(editedName, substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        pressBack()
+        composeRule.onNodeWithText("分类管理", substring = false).assertIsDisplayed()
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("分类管理", substring = false).performClick()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(editedName))
+        composeRule.onNodeWithText(editedName, substring = false).assertIsDisplayed()
     }
 
     @Test

@@ -60,19 +60,28 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
         mutableEvents.emit(UiEvent.Message("本月预算已保存"))
     }
 
-    fun saveCustomCategory(
+    fun saveCategory(
         existingId: String? = null,
         type: EntryType,
         name: String,
         parentId: String? = null,
+        iconKey: String = "other",
+        colorArgb: Long = 0xFF7593B8,
+        isActive: Boolean = true,
+        sortOrder: Int? = null,
     ) = launchOperation {
-        repository.saveCustomCategory(existingId, type, name, parentId)
+        repository.saveCategory(existingId, type, name, parentId, iconKey, colorArgb, isActive, sortOrder)
         mutableEvents.emit(UiEvent.Message("分类已保存"))
+    }
+
+    fun reorderCategories(orderedIds: List<String>) = launchOperation {
+        repository.reorderCategories(orderedIds)
+        mutableEvents.emit(UiEvent.Message("分类顺序已保存"))
     }
 
     fun deleteCustomCategory(category: Category) = launchOperation {
         if (repository.deleteCustomCategory(category.id)) {
-            mutableEvents.emit(UiEvent.Message(if (category.isCustom) "分类已停用或删除" else "分类未改变"))
+            mutableEvents.emit(UiEvent.Message(if (category.isCustom) "分类已停用或删除" else "预设分类已隐藏"))
         }
     }
 

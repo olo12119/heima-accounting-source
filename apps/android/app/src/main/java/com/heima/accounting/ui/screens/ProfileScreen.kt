@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,8 +61,10 @@ fun ProfileScreen(
     onData: () -> Unit,
 ) {
     val palette = HeimaTheme.palette
+    val listState = rememberLazyListState()
     LazyColumn(
         Modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -114,7 +117,7 @@ fun ProfileScreen(
                 }
             }
         }
-        item { Text("黑马记账 1.0.2", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
+        item { Text("黑马记账 1.0.3", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium) }
     }
 }
 

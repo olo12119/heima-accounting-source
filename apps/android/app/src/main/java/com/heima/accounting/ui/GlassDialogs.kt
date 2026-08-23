@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +58,7 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.heima.accounting.domain.DateRange
+import com.heima.accounting.domain.FinanceRules
 
 enum class CustomDateMode { SINGLE, RANGE }
 
@@ -208,13 +211,19 @@ fun LiquidGlassDateRangePicker(
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
-    var mode by remember(initialRange) {
-        mutableStateOf(if (initialRange.startInclusive == initialRange.endInclusive) CustomDateMode.SINGLE else CustomDateMode.RANGE)
+    val today = remember { LocalDate.now() }
+    val safeInitialRange = remember(initialRange, today) {
+        val safeEnd = minOf(initialRange.endInclusive, today)
+        val safeStart = minOf(initialRange.startInclusive, safeEnd)
+        DateRange(safeStart, safeEnd)
     }
-    var startDate by remember(initialRange) { mutableStateOf(initialRange.startInclusive) }
-    var endDate by remember(initialRange) { mutableStateOf(initialRange.endInclusive) }
-    var selectingEnd by remember(initialRange) { mutableStateOf(false) }
-    var shownMonth by remember(initialRange) { mutableStateOf(YearMonth.from(initialRange.startInclusive)) }
+    var mode by remember(safeInitialRange) {
+        mutableStateOf(if (safeInitialRange.startInclusive == safeInitialRange.endInclusive) CustomDateMode.SINGLE else CustomDateMode.RANGE)
+    }
+    var startDate by remember(safeInitialRange) { mutableStateOf(safeInitialRange.startInclusive) }
+    var endDate by remember(safeInitialRange) { mutableStateOf(safeInitialRange.endInclusive) }
+    var selectingEnd by remember(safeInitialRange) { mutableStateOf(false) }
+    var shownMonth by remember(safeInitialRange) { mutableStateOf(YearMonth.from(safeInitialRange.startInclusive)) }
     var direction by remember { mutableIntStateOf(1) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.SIMPLIFIED_CHINESE) }
     val selectedLabel = if (mode == CustomDateMode.SINGLE) {
@@ -256,7 +265,11 @@ fun LiquidGlassDateRangePicker(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 CalendarArrow("上一个月", "‹") { direction = -1; shownMonth = shownMonth.minusMonths(1) }
                 Text("${shownMonth.year}年${shownMonth.monthValue}月", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
-                CalendarArrow("下一个月", "›") { direction = 1; shownMonth = shownMonth.plusMonths(1) }
+                CalendarArrow(
+                    description = "下一个月",
+                    glyph = "›",
+                    enabled = shownMonth < YearMonth.from(today),
+                ) { direction = 1; shownMonth = shownMonth.plusMonths(1) }
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth()) {
@@ -282,7 +295,8 @@ fun LiquidGlassDateRangePicker(
                     month = month,
                     selectedStart = startDate,
                     selectedEnd = if (mode == CustomDateMode.RANGE) endDate else null,
-                    today = LocalDate.now(),
+                    today = today,
+                    maxSelectableDate = today,
                     onSelected = { date ->
                         onSelectionFeedback()
                         if (mode == CustomDateMode.SINGLE) {
@@ -310,9 +324,9 @@ fun LiquidGlassDateRangePicker(
                 DialogAction(
                     "确定",
                     {
-                        val range = if (mode == CustomDateMode.SINGLE) DateRange(startDate, startDate)
-                        else DateRange(minOf(startDate, endDate), maxOf(startDate, endDate))
-                        onConfirm(range)
+                        val first = if (mode == CustomDateMode.SINGLE) startDate else minOf(startDate, endDate)
+                        val last = if (mode == CustomDateMode.SINGLE) startDate else maxOf(startDate, endDate)
+                        FinanceRules.historicalRangeOrNull(first, last, today)?.let(onConfirm)
                     },
                     Modifier.weight(1f),
                     palette.brand,
@@ -328,6 +342,7 @@ private fun CalendarMonthGrid(
     selectedStart: LocalDate,
     selectedEnd: LocalDate?,
     today: LocalDate,
+    maxSelectableDate: LocalDate? = null,
     onSelected: (LocalDate) -> Unit,
 ) {
     val offset = month.atDay(1).dayOfWeek.value - DayOfWeek.MONDAY.value
@@ -344,7 +359,13 @@ private fun CalendarMonthGrid(
                         if (date != null) {
                             val selected = date == selectedStart || date == selectedEnd
                             val inRange = selectedEnd != null && !date.isBefore(selectedStart) && !date.isAfter(selectedEnd)
-                            CalendarDay(date, selected, inRange, date == today) { onSelected(date) }
+                            CalendarDay(
+                                date = date,
+                                selected = selected,
+                                inRange = inRange,
+                                today = date == today,
+                                enabled = maxSelectableDate == null || !date.isAfter(maxSelectableDate),
+                            ) { onSelected(date) }
                         }
                     }
                 }
@@ -354,7 +375,14 @@ private fun CalendarMonthGrid(
 }
 
 @Composable
-private fun CalendarDay(date: LocalDate, selected: Boolean, inRange: Boolean, today: Boolean, onClick: () -> Unit) {
+private fun CalendarDay(
+    date: LocalDate,
+    selected: Boolean,
+    inRange: Boolean,
+    today: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
     val shape = CircleShape
@@ -363,6 +391,10 @@ private fun CalendarDay(date: LocalDate, selected: Boolean, inRange: Boolean, to
             .size(36.dp)
             .semantics {
                 contentDescription = "${date.monthValue}月${date.dayOfMonth}日${if (today) "，今天" else ""}${if (selected) "，已选择" else ""}"
+                if (!enabled) {
+                    disabled()
+                    stateDescription = "未来日期不可选择"
+                }
             }
             .clip(shape)
             .background(
@@ -374,12 +406,16 @@ private fun CalendarDay(date: LocalDate, selected: Boolean, inRange: Boolean, to
                 },
             )
             .then(if (today && !selected) Modifier.border(1.dp, palette.brand.copy(.68f), shape) else Modifier)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             date.dayOfMonth.toString(),
-            color = if (selected) Color.White else palette.textPrimary,
+            color = when {
+                !enabled -> palette.textMuted.copy(alpha = .38f)
+                selected -> Color.White
+                else -> palette.textPrimary
+            },
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Normal,
         )
@@ -390,23 +426,35 @@ private fun CalendarDay(date: LocalDate, selected: Boolean, inRange: Boolean, to
 }
 
 @Composable
-private fun CalendarArrow(description: String, glyph: String, onClick: () -> Unit) {
+private fun CalendarArrow(
+    description: String,
+    glyph: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val palette = HeimaTheme.palette
     Box(
         Modifier
             .size(40.dp)
-            .semantics { contentDescription = description }
+            .semantics {
+                contentDescription = description
+                if (!enabled) disabled()
+            }
             .clip(CircleShape)
             .background(palette.surfaceMuted.copy(.64f))
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(glyph, color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            glyph,
+            color = if (enabled) palette.textPrimary else palette.textMuted.copy(alpha = .36f),
+            style = MaterialTheme.typography.headlineMedium,
+        )
     }
 }
 
 @Composable
-private fun HeimaDialogFrame(
+internal fun HeimaDialogFrame(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,

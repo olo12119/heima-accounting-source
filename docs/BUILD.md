@@ -1,6 +1,6 @@
 # 黑马记账构建说明
 
-> Android 1.0.1 已完成，普通用户安装 `手机安装包/黑马记账-Android-正式版-1.0.1.apk`；Android Studio 和完整测试命令见 [Android 构建与测试](android/BUILD_AND_TEST.md)。下文保留 Windows 1.5.0 独立产品线的构建说明。
+> Android 1.0.3 已完成，普通用户安装 `手机安装包/黑马记账-Android-正式版-1.0.3.apk`；Android Studio 和完整测试命令见 [Android 构建与测试](android/BUILD_AND_TEST.md)。下文保留 Windows 1.5.0 独立产品线的构建说明。
 
 ## 先分清两个项目
 

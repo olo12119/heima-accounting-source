@@ -42,14 +42,64 @@ private val sprites = mapOf(
     "health" to Sprite(5, 0),
     "education" to Sprite(6, 0),
     "gift" to Sprite(1, 1),
+    "router" to Sprite(0, 1),
     "travel" to Sprite(2, 1),
     "other" to Sprite(3, 1),
     "part_time" to Sprite(4, 1),
+    "subscription" to Sprite(5, 1),
     "business" to Sprite(6, 1),
     "investment" to Sprite(0, 2),
+    "receipt" to Sprite(1, 2),
     "salary" to Sprite(2, 2),
     "refund" to Sprite(3, 2),
+    "coffee" to Sprite(4, 2),
+    "bus" to Sprite(5, 2),
+    "clothing" to Sprite(6, 2),
     "pet" to Sprite(0, 3),
+    "baby" to Sprite(1, 3),
+    "plane" to Sprite(2, 3),
+    "game" to Sprite(3, 3),
+    "graduation" to Sprite(4, 3),
+    "medical" to Sprite(5, 3),
+    "wallet" to Sprite(6, 3),
+)
+
+internal val CategoryIconChoices = listOf(
+    "meal" to "餐饮",
+    "transport" to "汽车",
+    "bus" to "公交",
+    "shopping" to "购物",
+    "home" to "居住",
+    "entertainment" to "娱乐",
+    "game" to "游戏",
+    "health" to "健康",
+    "medical" to "医疗",
+    "education" to "书籍",
+    "graduation" to "教育",
+    "gift" to "礼物",
+    "travel" to "旅行箱",
+    "plane" to "飞机",
+    "router" to "网络",
+    "receipt" to "账单",
+    "clothing" to "服饰",
+    "pet" to "宠物",
+    "baby" to "育儿",
+    "subscription" to "订阅",
+    "salary" to "收入",
+    "investment" to "投资",
+    "business" to "经营",
+    "part_time" to "工作",
+    "refund" to "退款",
+    "wallet" to "钱包",
+    "other" to "其他",
+)
+
+/**
+ * 1.0.2 default categories accidentally stored some colors as AARRGGBBAA.
+ * Render those legacy values safely without rewriting or overriding user data.
+ */
+internal fun categoryColorFromArgb(stored: Long): Color = Color(
+    if (stored > 0xFFFFFFFFL) stored ushr 8 else stored,
 )
 
 private val LocalCategoryAtlas = staticCompositionLocalOf<ImageBitmap?> { null }

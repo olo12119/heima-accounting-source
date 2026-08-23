@@ -2,17 +2,19 @@ package com.heima.accounting.ui
 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,10 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,14 +44,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import androidx.compose.foundation.pager.PagerState
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
 import com.kyant.backdrop.Backdrop
@@ -63,14 +68,60 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+
+private const val NavigationFlingThresholdPxPerSecond = 760f
+
+private sealed interface NavigationDragCommand {
+    data class Position(val visualPosition: Float) : NavigationDragCommand
+    data class Finish(
+        val visualPosition: Float,
+        val fingerVelocityX: Float,
+    ) : NavigationDragCommand
+    data object Cancel : NavigationDragCommand
+}
+
+/**
+ * The persistent pager has four pages while the visual bar has five slots.
+ * RECORD occupies visual slot 2 but is a modal action, not a pager page.
+ */
+internal fun pagerPositionToVisualSlot(pagePosition: Float): Float = when {
+    pagePosition <= 1f -> pagePosition
+    pagePosition <= 2f -> 1f + (pagePosition - 1f) * 2f
+    else -> pagePosition + 1f
+}.coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+
+internal fun visualSlotToPagerPosition(visualPosition: Float): Float = when {
+    visualPosition <= 1f -> visualPosition
+    visualPosition <= 3f -> 1f + (visualPosition - 1f) / 2f
+    else -> visualPosition - 1f
+}.coerceIn(0f, 3f)
+
+internal fun navigationDragTargetPage(
+    pagePosition: Float,
+    fingerVelocityX: Float,
+    pageCount: Int = 4,
+): Int {
+    val lastPage = (pageCount - 1).coerceAtLeast(0)
+    val target = when {
+        fingerVelocityX > NavigationFlingThresholdPxPerSecond -> ceil(pagePosition + 0.001f).toInt()
+        fingerVelocityX < -NavigationFlingThresholdPxPerSecond -> floor(pagePosition - 0.001f).toInt()
+        else -> pagePosition.roundToInt()
+    }
+    return target.coerceIn(0, lastPage)
+}
 
 /** A continuous glass bar with one restrained sliding selection lens. */
 @Composable
 fun HeimaBottomBar(
     selected: AppDestination,
+    pagerState: PagerState,
     onDestinationSelected: (AppDestination) -> Unit,
     onRecord: () -> Unit,
     recordPanelVisible: Boolean,
@@ -81,23 +132,9 @@ fun HeimaBottomBar(
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
-    // Opening the record sheet is a modal action rather than a destination change.
-    // Keep the continuous lens on the current page so the large sheet does not enter
-    // while a second real-time refraction animation is competing for the same frame.
-    val lensTarget = selected
-    val lensPosition = remember { Animatable(lensTarget.ordinal.toFloat()) }
-    val animationScope = rememberCoroutineScope()
-    var draggingLens by remember { mutableStateOf(false) }
-    var lastBoundary by remember { mutableIntStateOf(lensTarget.ordinal) }
+    val navigationScope = rememberCoroutineScope()
     var dragMorph by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(navigationProgress) {
-        if (!draggingLens) {
-            // Pager drag already supplies a continuous fraction; applying a second
-            // spring here would make the lens lag behind the finger.
-            lensPosition.snapTo(navigationProgress)
-        }
-    }
+    var navigationDragJob by remember { mutableStateOf<Job?>(null) }
 
     GlassSurface(
         modifier = modifier.fillMaxWidth().height(76.dp).padding(horizontal = 14.dp),
@@ -109,50 +146,129 @@ fun HeimaBottomBar(
             val slotWidth = maxWidth / AppDestination.entries.size
             val slotWidthPx = with(LocalDensity.current) { slotWidth.toPx() }
             val lensWidth = slotWidth - 8.dp
-            val x = slotWidth * lensPosition.value + (slotWidth - lensWidth) / 2
+            // Recording is a modal action, but while its sheet is visible the same
+            // continuous lens rests on the primary slot to preserve a clear active state.
+            val displayNavigationProgress = if (recordPanelVisible) 2f else navigationProgress
+            val x = slotWidth * displayNavigationProgress + (slotWidth - lensWidth) / 2
             val velocityStretch = if (motion.reduceMotion) 0f else {
-                maxOf(min(abs(lensPosition.velocity) * 0.025f, 0.13f), min(abs(dragMorph) * .16f, .12f))
+                min(abs(dragMorph) * .16f, .12f)
             }
-            fun settleLens(openRecordWhenSelected: Boolean) {
-                val targetIndex = lensPosition.value.roundToInt().coerceIn(0, AppDestination.entries.lastIndex)
-                draggingLens = false
-                dragMorph = 0f
-                animationScope.launch {
-                    lensPosition.animateTo(
-                        targetIndex.toFloat(),
-                        if (motion.reduceMotion) tween(70) else spring(dampingRatio = .86f, stiffness = 460f),
-                    )
-                    val target = AppDestination.entries[targetIndex]
-                    if (target == AppDestination.RECORD) {
-                        if (openRecordWhenSelected) onRecord()
-                    } else {
-                        onDestinationSelected(target)
+
+            fun beginNavigationDrag(startingPage: Int): Channel<NavigationDragCommand> {
+                navigationDragJob?.cancel()
+                // Pointer samples can arrive faster than a frame. Only the newest
+                // absolute position matters; conflation prevents a stale drag queue
+                // from making the lens trail behind the finger or adding jank.
+                val commands = Channel<NavigationDragCommand>(Channel.CONFLATED)
+                navigationDragJob = navigationScope.launch {
+                    var finishVelocityX = 0f
+                    var finishVisualPosition = pagerPositionToVisualSlot(startingPage.toFloat())
+                    var cancelled = false
+                    try {
+                        pagerState.scroll(MutatePriority.UserInput) {
+                            while (true) {
+                                when (val command = commands.receive()) {
+                                    is NavigationDragCommand.Position -> {
+                                        val pageSizePx = pagerState.layoutInfo.pageSize.toFloat()
+                                        if (pageSizePx <= 0f || slotWidthPx <= 0f) continue
+                                        val currentPagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                                        val targetPagePosition = visualSlotToPagerPosition(command.visualPosition)
+                                        scrollBy((targetPagePosition - currentPagePosition) * pageSizePx)
+                                    }
+
+                                    is NavigationDragCommand.Finish -> {
+                                        finishVisualPosition = command.visualPosition
+                                        finishVelocityX = command.fingerVelocityX
+                                        break
+                                    }
+
+                                    NavigationDragCommand.Cancel -> {
+                                        cancelled = true
+                                        break
+                                    }
+                                }
+                            }
+                        }
+
+                        val pagePosition = visualSlotToPagerPosition(finishVisualPosition)
+                        val targetPage = if (cancelled) {
+                            startingPage
+                        } else {
+                            navigationDragTargetPage(pagePosition, finishVelocityX, pagerState.pageCount)
+                        }
+                        if (motion.reduceMotion) {
+                            pagerState.scrollToPage(targetPage)
+                        } else {
+                            pagerState.animateScrollToPage(
+                                page = targetPage,
+                                animationSpec = spring(dampingRatio = .90f, stiffness = 520f),
+                            )
+                        }
+                        if (!cancelled && targetPage != startingPage) onBoundaryFeedback()
+                    } finally {
+                        dragMorph = 0f
+                        commands.close()
                     }
                 }
+                return commands
             }
-            val lensDragModifier = Modifier.pointerInput(slotWidthPx, motion.reduceMotion) {
-                detectDragGestures(
-                    onDragStart = {
-                        draggingLens = true
-                        lastBoundary = lensPosition.value.roundToInt()
-                    },
-                    onDragEnd = { settleLens(openRecordWhenSelected = true) },
-                    onDragCancel = {
-                        draggingLens = false
-                        dragMorph = 0f
-                        animationScope.launch { lensPosition.animateTo(lensTarget.ordinal.toFloat()) }
-                    },
-                ) { change, dragAmount ->
-                    change.consume()
-                    dragMorph = (dragAmount.x / slotWidthPx).coerceIn(-1f, 1f)
-                    val next = (lensPosition.value + dragAmount.x / slotWidthPx)
-                        .coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
-                    val boundary = next.roundToInt()
-                    if (boundary != lastBoundary) {
-                        lastBoundary = boundary
-                        onBoundaryFeedback()
+
+            val directNavigationDrag = Modifier.pointerInput(pagerState, slotWidthPx, motion.reduceMotion) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val velocityTracker = VelocityTracker().apply {
+                        addPosition(down.uptimeMillis, down.position)
                     }
-                    animationScope.launch { lensPosition.snapTo(next) }
+                    var overSlopX = 0f
+                    val dragStart = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
+                        if (overSlop != 0f) {
+                            overSlopX = overSlop
+                            change.consume()
+                        }
+                    } ?: return@awaitEachGesture
+
+                    val startingPage = pagerState.settledPage
+                    val startingVisualPosition = pagerPositionToVisualSlot(startingPage.toFloat())
+                    val commands = beginNavigationDrag(startingPage)
+                    var finishedNormally = false
+                    var latestVisualPosition = startingVisualPosition
+                    try {
+                        latestVisualPosition = (startingVisualPosition +
+                            (dragStart.position.x - down.position.x) / slotWidthPx)
+                            .coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+                        commands.trySend(NavigationDragCommand.Position(latestVisualPosition))
+                        dragMorph = (overSlopX / slotWidthPx).coerceIn(-1f, 1f)
+                        var activeChange = dragStart
+                        while (activeChange.pressed) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            latestVisualPosition = (startingVisualPosition +
+                                (change.position.x - down.position.x) / slotWidthPx)
+                                .coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+                            if (!change.pressed) {
+                                finishedNormally = true
+                                break
+                            }
+                            val deltaX = change.positionChange().x
+                            if (deltaX != 0f) {
+                                change.consume()
+                                commands.trySend(NavigationDragCommand.Position(latestVisualPosition))
+                                dragMorph = (deltaX / slotWidthPx).coerceIn(-1f, 1f)
+                            }
+                            activeChange = change
+                        }
+                    } finally {
+                        val command = if (finishedNormally) {
+                            NavigationDragCommand.Finish(
+                                visualPosition = latestVisualPosition,
+                                fingerVelocityX = velocityTracker.calculateVelocity().x,
+                            )
+                        } else {
+                            NavigationDragCommand.Cancel
+                        }
+                        commands.trySend(command)
+                    }
                 }
             }
             val baseLens = Modifier
@@ -200,7 +316,13 @@ fun HeimaBottomBar(
                 },
             )
 
-            Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .matchParentSize()
+                    .semantics { contentDescription = "底部导航，可直接左右拖动" }
+                    .then(directNavigationDrag),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 AppDestination.entries.forEach { destination ->
                     BottomBarItem(
                         destination = destination,
@@ -213,24 +335,6 @@ fun HeimaBottomBar(
                     )
                 }
             }
-            // Keep a drag target above the tab row only where the current lens is.
-            // This makes the lens draggable without hijacking horizontal gestures
-            // across the whole navigation bar.
-            Box(
-                Modifier
-                    .offset { IntOffset(x.roundToPx(), 8.dp.roundToPx()) }
-                    .width(lensWidth)
-                    .height(60.dp)
-                    .semantics { contentDescription = "底部导航选中镜片，可左右拖动" }
-                    .then(lensDragModifier)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
-                        if (lensTarget == AppDestination.RECORD) onRecord()
-                        else onDestinationSelected(lensTarget)
-                    },
-            )
         }
     }
 }
@@ -266,7 +370,16 @@ private fun BottomBarItem(
     Column(
         modifier = modifier
             .height(76.dp)
-            .semantics { contentDescription = destination.accessibilityLabel }
+            .semantics {
+                contentDescription = destination.accessibilityLabel
+                stateDescription = when {
+                    primary && selected -> "主操作，已打开"
+                    primary -> "主操作"
+                    selected -> "已选中"
+                    else -> "未选中"
+                }
+                this.selected = selected
+            }
             .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .clickable(source, indication = null, role = Role.Tab, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -274,21 +387,27 @@ private fun BottomBarItem(
     ) {
         Box(
             modifier = Modifier
-                .size(if (primary) 38.dp else 23.dp)
+                .size(if (primary) 44.dp else 23.dp)
                 .then(
                     if (primary) {
                         Modifier
-                            .clip(RoundedCornerShape(15.dp))
+                            .clip(RoundedCornerShape(17.dp))
                             .background(
                                 Brush.radialGradient(
                                     listOf(
-                                        palette.glassHighlight.copy(alpha = if (motion.darkTheme) .14f else .62f),
-                                        palette.brandSoft.copy(alpha = if (motion.darkTheme) .62f else .90f),
+                                        palette.glassHighlight.copy(alpha = if (motion.darkTheme) .10f else .62f),
+                                        palette.brand.copy(alpha = if (motion.darkTheme) .44f else .34f),
+                                        palette.brandSoft.copy(alpha = if (motion.darkTheme) .72f else .94f),
                                     ),
                                 ),
                             )
-                            .border(1.dp, palette.brand.copy(alpha = .40f), RoundedCornerShape(15.dp))
-                            .padding(6.dp)
+                            .border(
+                                1.2.dp,
+                                if (motion.darkTheme) palette.accent.copy(alpha = .58f)
+                                else palette.glassHighlight.copy(alpha = .92f),
+                                RoundedCornerShape(17.dp),
+                            )
+                            .padding(7.dp)
                     } else Modifier
                 )
                 .graphicsLayer {

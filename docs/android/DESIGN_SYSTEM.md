@@ -125,7 +125,7 @@
 - `HealthStatusChip`：可解释财务健康状态。
 - `BudgetRemainCard`：预算剩余和时间进度。
 - `CategorySpendCard`：分类金额、占比和主题图标。
-- `MiniTrendChart`：七日趋势。
+- `MiniTrendChart`：从本月 1 日到今天的连续本月趋势，缺少账单的日期补零。
 - `TransactionRow`：最近账单行。
 
 ### 记账

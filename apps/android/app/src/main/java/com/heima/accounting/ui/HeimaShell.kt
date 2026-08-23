@@ -4,6 +4,12 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
@@ -31,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,14 +111,18 @@ fun HeimaShell(
     val navigationProgress by remember {
         derivedStateOf {
             val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
-            when {
-                pagePosition <= 1f -> pagePosition
-                pagePosition <= 2f -> 1f + (pagePosition - 1f) * 2f
-                else -> pagePosition + 1f
-            }.coerceIn(0f, AppDestination.entries.lastIndex.toFloat())
+            pagerPositionToVisualSlot(pagePosition)
         }
     }
-    var managementPage by rememberSaveable { mutableStateOf<ManagementPage?>(null) }
+    var secondaryBackStack by rememberSaveable { mutableStateOf<List<ManagementPage>>(emptyList()) }
+    val managementPage = secondaryBackStack.lastOrNull()
+    val navigateToSecondary: (ManagementPage) -> Unit = { page ->
+        if (secondaryBackStack.lastOrNull() != page) secondaryBackStack = secondaryBackStack + page
+    }
+    val popSecondary: () -> Unit = {
+        if (secondaryBackStack.isNotEmpty()) secondaryBackStack = secondaryBackStack.dropLast(1)
+    }
+    val pageStateHolder = rememberSaveableStateHolder()
     var recordPanelVisible by rememberSaveable { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
     var restoreCandidate by remember { mutableStateOf<String?>(null) }
@@ -184,7 +195,7 @@ fun HeimaShell(
     }
 
     BackHandler(enabled = !recordPanelVisible && managementPage != null) {
-        managementPage = null
+        popSecondary()
     }
 
     ProvideCategoryArtwork {
@@ -214,20 +225,48 @@ fun HeimaShell(
             ) {
             AmbientBackdrop(Modifier.fillMaxSize().then(backdropRecorder))
             Box(Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = managementPage,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        if (motion.reduceMotion) {
+                            fadeIn(tween(70)) togetherWith fadeOut(tween(60))
+                        } else if (targetState != null) {
+                            (slideInHorizontally(tween(220)) { it / 4 } + fadeIn(tween(170))) togetherWith
+                                (slideOutHorizontally(tween(200)) { -it / 5 } + fadeOut(tween(140)))
+                        } else {
+                            (slideInHorizontally(tween(220)) { -it / 5 } + fadeIn(tween(170))) togetherWith
+                                (slideOutHorizontally(tween(200)) { it / 4 } + fadeOut(tween(140)))
+                        }
+                    },
+                    label = "secondary_navigation",
+                ) { secondaryPage ->
                 when {
                     ledgerState.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     !ledgerState.integrityOkay -> IntegrityError(ledgerState.errorMessage)
-                    managementPage == ManagementPage.RECORDS -> RecordsScreen(
-                        ledgerState.snapshot, amountsVisible, { managementPage = null },
+                    secondaryPage == ManagementPage.RECORDS -> pageStateHolder.SaveableStateProvider("records") { RecordsScreen(
+                        ledgerState.snapshot, amountsVisible, popSecondary,
                         { editing = it; recordPanelVisible = true }, { viewModel.deleteTransaction(it.id) },
-                    )
-                    managementPage == ManagementPage.CATEGORIES -> CategoriesScreen(
-                        ledgerState.snapshot, { managementPage = null },
-                        { id, type, name, parent -> viewModel.saveCustomCategory(id, type, name, parent) },
+                    ) }
+                    secondaryPage == ManagementPage.CATEGORIES -> pageStateHolder.SaveableStateProvider("categories") { CategoriesScreen(
+                        ledgerState.snapshot, popSecondary,
+                        { category ->
+                            viewModel.saveCategory(
+                                category.id.takeIf(String::isNotBlank),
+                                category.type,
+                                category.name,
+                                category.parentId,
+                                category.iconKey,
+                                category.colorArgb,
+                                category.isActive,
+                                category.sortOrder,
+                            )
+                        },
                         viewModel::deleteCustomCategory,
-                    )
-                    managementPage == ManagementPage.DATA -> DataScreen(
-                        { managementPage = null },
+                        viewModel::reorderCategories,
+                    ) }
+                    secondaryPage == ManagementPage.DATA -> pageStateHolder.SaveableStateProvider("data") { DataScreen(
+                        popSecondary,
                         {
                             scope.launch {
                                 pendingExport = viewModel.exportCsv()
@@ -241,8 +280,8 @@ fun HeimaShell(
                             }
                         },
                         { openDocument.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
-                    )
-                    else -> HorizontalPager(
+                    ) }
+                    else -> pageStateHolder.SaveableStateProvider("main_pager") { HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize(),
                         beyondViewportPageCount = 0,
@@ -250,10 +289,19 @@ fun HeimaShell(
                         key = { PagerDestinations[it] },
                     ) { page ->
                         val screen = PagerDestinations[page]
+                        pageStateHolder.SaveableStateProvider("main_${screen.name}") {
                         when (screen) {
                             AppDestination.HOME -> HomeScreen(
                                 ledgerState.snapshot, amountsVisible, onAmountsVisibleChange,
-                                { recordPanelVisible = true }, { managementPage = ManagementPage.RECORDS },
+                                { recordPanelVisible = true },
+                                {
+                                    val budgetPage = PagerDestinations.indexOf(AppDestination.BUDGET)
+                                    scope.launch {
+                                        if (motion.reduceMotion) pagerState.scrollToPage(budgetPage)
+                                        else pagerState.animateScrollToPage(budgetPage)
+                                    }
+                                },
+                                { navigateToSecondary(ManagementPage.RECORDS) },
                                 { editing = it.let { id -> ledgerState.snapshot.transactions.firstOrNull { transaction -> transaction.id == id } }; recordPanelVisible = editing != null },
                             )
                             AppDestination.STATISTICS -> StatisticsScreen(
@@ -268,17 +316,23 @@ fun HeimaShell(
                                 liquidGlassEnabled, soundEnabled, hapticEnabled,
                                 onThemeStyleChange, onColorModeChange, onVisualQualityChange, onReduceMotionChange,
                                 onLiquidGlassEnabledChange, onSoundEnabledChange, onHapticEnabledChange,
-                                { managementPage = ManagementPage.CATEGORIES }, { managementPage = ManagementPage.RECORDS }, { managementPage = ManagementPage.DATA },
+                                { navigateToSecondary(ManagementPage.CATEGORIES) },
+                                { navigateToSecondary(ManagementPage.RECORDS) },
+                                { navigateToSecondary(ManagementPage.DATA) },
                             )
                             AppDestination.RECORD -> error("记账是主操作，不是 Pager 页面")
                         }
+                        }
                     }
+                    }
+                }
                 }
             }
 
-            if (managementPage == null && ledgerState.integrityOkay && !ledgerState.loading && !recordPanelVisible) {
+            if (managementPage == null && ledgerState.integrityOkay && !ledgerState.loading) {
                 HeimaBottomBar(
                     destination,
+                    pagerState,
                     { target ->
                         val page = PagerDestinations.indexOf(target)
                         if (page >= 0) {
@@ -320,7 +374,7 @@ fun HeimaShell(
                         editing,
                         { recordPanelVisible = false; editing = null },
                         { transaction -> viewModel.saveTransaction(transaction); recordPanelVisible = false; editing = null },
-                        { managementPage = ManagementPage.CATEGORIES; recordPanelVisible = false },
+                        { navigateToSecondary(ManagementPage.CATEGORIES); recordPanelVisible = false },
                         feedback::selection,
                     )
                 }

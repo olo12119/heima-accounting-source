@@ -28,12 +28,14 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
     override fun onCreate(db: SQLiteDatabase) {
         createVersionOne(db)
         seedDefaultCategories(db)
+        migrateOneToTwo(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         var version = oldVersion
         while (version < newVersion) {
             when (version) {
+                1 -> migrateOneToTwo(db)
                 else -> error("缺少数据库迁移：$version → ${version + 1}")
             }
             version += 1
@@ -139,29 +141,75 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         )
     }
 
-    fun upsertCustomCategory(category: Category) {
-        require(category.isCustom) { "只能新增或修改自定义分类" }
+    fun upsertCategory(category: Category) {
         require(category.name.isNotBlank() && category.name.length <= 20)
         val parent = category.parentId?.let(::findCategory)
         require(parent == null || (parent.parentId == null && parent.type == category.type)) {
             "二级分类必须属于同类型的一级分类"
         }
-        writableDatabase.insertWithOnConflict(
-            "categories",
-            null,
-            category.toValues(),
-            SQLiteDatabase.CONFLICT_REPLACE,
-        )
+        val existing = findCategory(category.id)
+        if (existing == null) {
+            writableDatabase.insertOrThrow("categories", null, category.toValues())
+        } else {
+            require(existing.isCustom == category.isCustom) { "分类来源不能改变" }
+            val updated = writableDatabase.update(
+                "categories",
+                category.toValues(includeId = false),
+                "id = ?",
+                arrayOf(category.id),
+            )
+            check(updated == 1) { "分类更新失败" }
+        }
+    }
+
+    fun upsertCustomCategory(category: Category) {
+        require(category.isCustom) { "只能新增或修改自定义分类" }
+        upsertCategory(category)
+    }
+
+    fun setCategoryActive(categoryId: String, active: Boolean): Boolean = writableDatabase.update(
+        "categories",
+        ContentValues().apply { put("is_active", if (active) 1 else 0) },
+        "id = ?",
+        arrayOf(categoryId),
+    ) == 1
+
+    fun reorderCategories(orderedIds: List<String>) = writableDatabase.inTransaction {
+        val categories = orderedIds.map { id -> findCategory(id) ?: error("分类不存在") }
+        if (categories.isEmpty()) return@inTransaction
+        val first = categories.first()
+        require(categories.all { it.type == first.type && it.parentId == first.parentId }) {
+            "只能在同一分类层级内排序"
+        }
+        orderedIds.forEachIndexed { index, id ->
+            update(
+                "categories",
+                ContentValues().apply { put("sort_order", index) },
+                "id = ?",
+                arrayOf(id),
+            )
+        }
     }
 
     fun deactivateOrDeleteCustomCategory(categoryId: String): Boolean = writableDatabase.inTransaction {
         val category = findCategory(categoryId) ?: return@inTransaction false
-        require(category.isCustom) { "预设分类不能删除" }
+        if (!category.isCustom) {
+            return@inTransaction update(
+                "categories",
+                ContentValues().apply { put("is_active", 0) },
+                "id = ?",
+                arrayOf(categoryId),
+            ) == 1
+        }
         val count = rawQuery(
             "SELECT COUNT(*) FROM transactions WHERE category_id = ? OR subcategory_id = ?",
             arrayOf(categoryId, categoryId),
         ).use { cursor -> cursor.moveToFirst(); cursor.getLong(0) }
-        if (count > 0L) {
+        val childCount = rawQuery(
+            "SELECT COUNT(*) FROM categories WHERE parent_id = ?",
+            arrayOf(categoryId),
+        ).use { cursor -> cursor.moveToFirst(); cursor.getLong(0) }
+        if (count > 0L || childCount > 0L) {
             update("categories", ContentValues().apply { put("is_active", 0) }, "id = ?", arrayOf(categoryId)) == 1
         } else {
             delete("categories", "id = ?", arrayOf(categoryId)) == 1
@@ -268,9 +316,29 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         DefaultCategories.all.forEach { db.insertOrThrow("categories", null, it.toValues()) }
     }
 
+    private fun migrateOneToTwo(db: SQLiteDatabase) {
+        DefaultCategories.all.forEach { category ->
+            db.insertWithOnConflict(
+                "categories",
+                null,
+                category.toValues(),
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+        }
+        db.insertWithOnConflict(
+            "schema_migrations",
+            null,
+            ContentValues().apply {
+                put("version", 2)
+                put("applied_at", System.currentTimeMillis())
+            },
+            SQLiteDatabase.CONFLICT_IGNORE,
+        )
+    }
+
     companion object {
         const val DATABASE_NAME = "heima-accounting.sqlite3"
-        const val DATABASE_VERSION = 1
+        const val DATABASE_VERSION = 2
 
         private val CATEGORY_COLUMNS = arrayOf(
             "id", "type", "name", "icon_key", "color_argb", "parent_id", "is_custom", "is_active", "sort_order",
@@ -283,8 +351,8 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
     }
 }
 
-private fun Category.toValues(): ContentValues = ContentValues().apply {
-    put("id", id)
+private fun Category.toValues(includeId: Boolean = true): ContentValues = ContentValues().apply {
+    if (includeId) put("id", id)
     put("type", type.name)
     put("name", name)
     put("icon_key", iconKey)

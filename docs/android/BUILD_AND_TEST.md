@@ -12,7 +12,7 @@
 当前唯一正式文件：
 
 ```text
-手机安装包\黑马记账-Android-正式版-1.0.2.apk
+手机安装包\黑马记账-Android-正式版-1.0.3.apk
 ```
 
 它和 Android Studio 调试运行的区别：APK 用项目专用发布密钥签名，适合手机长期安装；Android Studio 运行的是 `.dev` 调试包，适合电脑开发检查。
@@ -37,8 +37,8 @@ Set-Location '.\apps\android'
 ```
 
 - `lintRelease`：以正式包配置检查 Android/Compose 错误和性能隐患。
-- JVM 测试：金额、日期、分类、CSV、反馈门和真实财务洞察等 26 项。
-- `connectedDebugAndroidTest`：在已启动的模拟器执行 30 项数据库、UI、手势和截图测试。
+- JVM 测试：金额、连续月趋势、日期、分类、CSV、反馈门和真实财务洞察等 34 项。
+- `connectedDebugAndroidTest`：在已启动的模拟器执行 38 项数据库迁移、UI、手势和截图测试。
 - `assembleRelease`：生成 R8 压缩的未签名 Release 中间产物。
 
 最终签名使用忽略 Git 的 `.local-signing/heima-release.jks`。密钥丢失后无法给现有用户做覆盖升级，因此必须单独备份。

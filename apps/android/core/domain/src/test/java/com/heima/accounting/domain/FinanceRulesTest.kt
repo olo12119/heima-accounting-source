@@ -51,10 +51,15 @@ class FinanceRulesTest {
     }
 
     @Test fun completeDefaultsContainBothLevelsAndBothTypes() {
-        assertTrue(DefaultCategories.all.count { it.type == EntryType.EXPENSE && it.parentId == null } >= 10)
+        assertTrue(DefaultCategories.all.count { it.type == EntryType.EXPENSE && it.parentId == null } >= 16)
         assertTrue(DefaultCategories.all.count { it.type == EntryType.INCOME && it.parentId == null } >= 7)
         assertTrue(DefaultCategories.all.any { it.parentId == "expense_food" && it.name == "早餐" })
         assertTrue(DefaultCategories.all.any { it.parentId == "income_salary" && it.name == "基本工资" })
+        assertEquals(DefaultCategories.all.size, DefaultCategories.all.map(Category::id).distinct().size)
+        val byId = DefaultCategories.all.associateBy(Category::id)
+        assertTrue(DefaultCategories.all.filter { it.parentId != null }.all { child ->
+            byId[child.parentId]?.type == child.type && byId[child.parentId]?.parentId == null
+        })
     }
 
     @Test fun tenThousandTransactionsAggregateWithoutAmountDrift() {
@@ -100,5 +105,74 @@ class FinanceRulesTest {
         assertTrue(LocalDate.of(2026, 8, 1) in range)
         assertTrue(LocalDate.of(2026, 8, 15) in range)
         assertTrue(LocalDate.of(2026, 8, 16) !in range)
+    }
+
+    @Test fun monthlyTrendKeepsAnEmptyLedgerAsAnEmptyState() {
+        val range = DateRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 23))
+        assertTrue(FinanceRules.continuousDailyTotals(emptyList(), range).isEmpty())
+    }
+
+    @Test fun monthlyTrendFillsZeroDaysOnlyUntilToday() {
+        val range = DateRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 23))
+        val result = FinanceRules.continuousDailyTotals(
+            listOf(DailyTotal(LocalDate.of(2026, 8, 23), expenseCents = 2_200L, incomeCents = 0L)),
+            range,
+        )
+
+        assertEquals(23, result.size)
+        assertEquals(0L, result.first().expenseCents)
+        assertEquals(2_200L, result.last().expenseCents)
+        assertEquals(LocalDate.of(2026, 8, 23), result.last().date)
+    }
+
+    @Test fun monthlyTrendOnTheFirstDayProducesARealSinglePoint() {
+        val day = LocalDate.of(2026, 9, 1)
+        val result = FinanceRules.continuousDailyTotals(
+            listOf(DailyTotal(day, expenseCents = 800L, incomeCents = 0L)),
+            DateRange(day, day),
+        )
+
+        assertEquals(listOf(DailyTotal(day, 800L, 0L)), result)
+    }
+
+    @Test fun monthlyTrendKeepsTwoDaysAndDoesNotLeakAcrossMonthBoundary() {
+        val range = DateRange(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2))
+        val result = FinanceRules.continuousDailyTotals(
+            listOf(
+                DailyTotal(LocalDate.of(2026, 7, 31), expenseCents = 9_900L, incomeCents = 0L),
+                DailyTotal(LocalDate.of(2026, 8, 1), expenseCents = 300L, incomeCents = 0L),
+                DailyTotal(LocalDate.of(2026, 8, 2), expenseCents = 600L, incomeCents = 0L),
+            ),
+            range,
+        )
+
+        assertEquals(listOf(300L, 600L), result.map(DailyTotal::expenseCents))
+        assertEquals(listOf(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2)), result.map(DailyTotal::date))
+    }
+
+    @Test fun monthlyTrendAggregatesSameDayAndKeepsMiddleZeroDates() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val transactions = listOf(
+            Transaction(type = EntryType.EXPENSE, amountCents = 500L, categoryId = "expense_food", occurredAtEpochMillis = LocalDate.of(2026, 7, 2).atStartOfDay(zone).toInstant().toEpochMilli()),
+            Transaction(type = EntryType.EXPENSE, amountCents = 700L, categoryId = "expense_food", occurredAtEpochMillis = LocalDate.of(2026, 7, 2).atTime(12, 0).atZone(zone).toInstant().toEpochMilli()),
+            Transaction(type = EntryType.EXPENSE, amountCents = 900L, categoryId = "expense_food", occurredAtEpochMillis = LocalDate.of(2026, 7, 4).atStartOfDay(zone).toInstant().toEpochMilli()),
+        )
+        val range = DateRange(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 4))
+        val summary = FinanceRules.summarize(transactions, range, zone)
+        val result = FinanceRules.continuousDailyTotals(summary.dailyTotals, range)
+
+        assertEquals(listOf(0L, 1_200L, 0L, 900L), result.map(DailyTotal::expenseCents))
+    }
+
+    @Test fun customStatisticsRangeRejectsFutureButAcceptsHistoricalCrossMonthDates() {
+        val today = LocalDate.of(2026, 8, 23)
+        assertNull(FinanceRules.historicalRangeOrNull(today.plusDays(1), today.plusDays(1), today))
+        assertNull(FinanceRules.historicalRangeOrNull(today.minusDays(1), today.plusDays(1), today))
+        assertNull(FinanceRules.historicalRangeOrNull(today, today.minusDays(1), today))
+        assertEquals(DateRange(today, today), FinanceRules.historicalRangeOrNull(today, today, today))
+        assertEquals(
+            DateRange(LocalDate.of(2026, 7, 28), LocalDate.of(2026, 8, 2)),
+            FinanceRules.historicalRangeOrNull(LocalDate.of(2026, 7, 28), LocalDate.of(2026, 8, 2), today),
+        )
     }
 }

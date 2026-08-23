@@ -81,13 +81,15 @@ class AccountingRepository(
         database.upsertBudget(MonthlyBudget(month, amountCents))
     }
 
-    suspend fun saveCustomCategory(
+    suspend fun saveCategory(
         existingId: String? = null,
         type: EntryType,
         name: String,
         parentId: String? = null,
         iconKey: String = "other",
         colorArgb: Long = 0xFF7593B8,
+        isActive: Boolean = true,
+        sortOrder: Int? = null,
     ): Category = mutate {
         val categories = database.readCategories()
         val normalized = name.trim()
@@ -98,7 +100,10 @@ class AccountingRepository(
             },
         ) { "同一层级已经有这个分类" }
         val previous = existingId?.let { id -> categories.firstOrNull { it.id == id } }
-        require(previous == null || previous.isCustom) { "预设分类不能修改" }
+        if (previous != null) {
+            require(previous.type == type) { "已有分类的收支类型不能改变" }
+            require(previous.parentId == parentId) { "已有分类的父子关系不能改变" }
+        }
         val category = Category(
             id = previous?.id ?: "custom_${UUID.randomUUID()}",
             type = type,
@@ -106,12 +111,27 @@ class AccountingRepository(
             iconKey = iconKey,
             colorArgb = colorArgb,
             parentId = parentId,
-            isCustom = true,
-            isActive = true,
-            sortOrder = previous?.sortOrder ?: (categories.maxOfOrNull(Category::sortOrder) ?: 0) + 1,
+            isCustom = previous?.isCustom ?: true,
+            isActive = isActive,
+            sortOrder = sortOrder ?: previous?.sortOrder ?: (
+                categories.filter { it.type == type && it.parentId == parentId }.maxOfOrNull(Category::sortOrder) ?: -1
+            ) + 1,
         )
-        database.upsertCustomCategory(category)
+        database.upsertCategory(category)
         category
+    }
+
+    suspend fun saveCustomCategory(
+        existingId: String? = null,
+        type: EntryType,
+        name: String,
+        parentId: String? = null,
+        iconKey: String = "other",
+        colorArgb: Long = 0xFF7593B8,
+    ): Category = saveCategory(existingId, type, name, parentId, iconKey, colorArgb)
+
+    suspend fun reorderCategories(orderedIds: List<String>) = mutate {
+        database.reorderCategories(orderedIds)
     }
 
     suspend fun deleteCustomCategory(id: String): Boolean = mutate {

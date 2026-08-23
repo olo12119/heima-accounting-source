@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +66,7 @@ import com.heima.accounting.ui.AnimatedTrendChart
 import com.heima.accounting.ui.LiquidGlassDateRangePicker
 import com.heima.accounting.ui.SensitiveAmountText
 import com.heima.accounting.ui.TransactionRow
+import com.heima.accounting.ui.categoryColorFromArgb
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -77,12 +80,18 @@ fun StatisticsScreen(
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
-    var period by remember { mutableStateOf(StatisticsPeriod.MONTH) }
-    var customRange by remember { mutableStateOf<DateRange?>(null) }
+    var period by rememberSaveable { mutableStateOf(StatisticsPeriod.TODAY) }
+    var customStartIso by rememberSaveable { mutableStateOf<String?>(null) }
+    var customEndIso by rememberSaveable { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf(StatisticsResult()) }
     var selectedSliceIndex by remember { mutableIntStateOf(-1) }
     var showOtherCategories by remember { mutableStateOf(false) }
+    val customRange = remember(customStartIso, customEndIso) {
+        val start = customStartIso?.let(LocalDate::parse)
+        val end = customEndIso?.let(LocalDate::parse)
+        if (start != null && end != null) DateRange(start, end) else null
+    }
     val range = customRange ?: FinanceRules.range(period, LocalDate.now())
     val summary = result.summary
     val periods = listOf(
@@ -104,7 +113,7 @@ fun StatisticsScreen(
         val base = if (slice.isOther) {
             palette.chartColors.last()
         } else {
-            snapshot.category(slice.categoryId)?.colorArgb?.let(::Color)
+            snapshot.category(slice.categoryId)?.colorArgb?.let(::categoryColorFromArgb)
                 ?: palette.chartColors[index % palette.chartColors.size]
         }
         if (motion.darkTheme) lerp(base, Color.White, .16f) else base
@@ -116,8 +125,10 @@ fun StatisticsScreen(
         else result.transactions.filter { it.categoryId in selectedCategoryIds }
     }
 
+    val listState = rememberLazyListState()
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -143,7 +154,7 @@ fun StatisticsScreen(
                 CustomRangeHeader(
                     range = range,
                     onEdit = { showDatePicker = true },
-                    onReset = { customRange = null },
+                    onReset = { customStartIso = null; customEndIso = null },
                 )
             }
         }
@@ -291,7 +302,7 @@ fun StatisticsScreen(
             items(summary.categoryTotals, key = CategoryTotal::categoryId) { total ->
                 val index = summary.categoryTotals.indexOf(total)
                 val category = snapshot.category(total.categoryId)
-                val categoryColor = category?.colorArgb?.let(::Color) ?: palette.brand
+                val categoryColor = category?.colorArgb?.let(::categoryColorFromArgb) ?: palette.brand
                 GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false) {
                     Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -324,7 +335,8 @@ fun StatisticsScreen(
             onDismiss = { showDatePicker = false },
             onSelectionFeedback = onSelectionFeedback,
             onConfirm = {
-                customRange = it
+                customStartIso = it.startInclusive.toString()
+                customEndIso = it.endInclusive.toString()
                 showDatePicker = false
             },
         )

@@ -1,67 +1,63 @@
-# 黑马记账 Android 1.0.2 性能报告
+# 黑马记账 Android 1.0.3 性能报告
 
-## 测试环境
+## 测试环境与边界
 
-- Android Studio AVD：`Heima_Android_16`
-- Android 16 / API 36，1080×2400，模拟 60Hz
-- Debug：自动手势和 `dumpsys gfxinfo`；R8 Release：最终冷启动与冒烟
-- 采样脚本：`measure-tab-performance.ps1`、`measure-record-sheet-performance.ps1`、`measure-navigation-drag-performance.ps1`
+- Android Studio AVD：`Heima_Android_16`，Android 16 / API 36，1080×2400，模拟 60Hz。
+- Debug 用自动手势、`dumpsys gfxinfo`、`meminfo` 和启动计时；R8 Release 用于最终冷启动与冒烟。
+- 模拟器适合发现版本间趋势，不代表真实手机 GPU、90/120Hz、耗电或温升。
 
-模拟器适合发现趋势，不代表真实手机 GPU、120Hz、耗电或温升。本报告保留所有有效高压结果，不以“肉眼流畅”代替数据。
-
-## 有效采样
+## 高压场景采样
 
 | 场景 | Glass | 总帧 | 现代 Jank | P50/P90/P95/P99 | GPU P50/P90/P95 | 总 PSS |
 | --- | --- | ---: | ---: | --- | --- | ---: |
-| 快速记账打开/关闭 12 次 | ON | 312 | 49（15.71%） | 19/48/77/117ms | 16/20/24ms | 112,518 KB |
-| 快速记账打开/关闭 12 次 | OFF | 307 | 42（13.68%） | 18/48/77/133ms | 15/19/20ms | 106,541 KB |
-| 底栏 Lens 拖动与吸附 8 轮 | ON | 497 | 48（9.66%） | 22/42/53/150ms | 16/21/23ms | 123,124 KB |
-| 底栏 Lens 拖动与吸附 8 轮 | OFF | 486 | 44（9.05%） | 18/31/38/101ms | 15/19/21ms | 106,180 KB |
+| 快速记账打开/关闭 12 次 | ON | 327 | 44（13.46%） | 21/34/93/117ms | 15/21/24ms | 107,479 KB |
+| 快速记账打开/关闭 12 次 | OFF | 320 | 42（13.12%） | 18/34/81/117ms | 14/19/22ms | 103,075 KB |
+| 底栏 Lens 直接拖动 8 轮 | ON | 702 | 84（11.97%） | 34/48/81/150ms | 17/22/23ms | 119,780 KB |
+| 底栏 Lens 直接拖动 8 轮 | OFF | 720 | 50（6.94%） | 25/38/57/117ms | 17/21/22ms | 118,223 KB |
 
 说明：
 
-- `dumpsys` 在拖动样本的 GPU P99 返回 4950ms 哨兵异常值，因此表中不采用 P99；P50/P90/P95 正常可用。
-- 压力脚本连续操作，间隔短于普通用户使用节奏，数值用于版本回归而非承诺帧率。
-- Glass OFF 的中位帧时间和内存均较低，证明关闭开关确实降低材质成本，而不是视觉反转。
-- Glass ON 的高压 Jank 仍未达到理想目标，必须在主力真机上继续验收；功能层面可随时关闭 Glass。
+- 脚本连续快速操作，压力高于普通用户节奏；数值用于回归，不承诺真机帧率。
+- 模拟器 GPU P99 偶发返回 4950ms 哨兵异常值，因此表中只采用 P50/P90/P95。
+- Glass OFF 的底栏拖动 Jank 明显较低，证明开关确实减少实时材质成本，不存在开关反转。
+- Glass ON 的底栏拖动仍未达到理想目标；产品保留自动质量、省电和完全关闭 Glass 的降级路线，并必须在主力真机继续验收。
 
-## 启动、CPU 与内存
+## 启动、CPU 与数据规模
 
-- ✅ 1.0.2 R8 正式包覆盖安装后的冷启动：622ms。
-- ✅ Debug 高压脚本冷启动样本：716～854ms。
-- ✅ 压力结束后的瞬时 CPU 样本为 0～0.1%；这只表示静止后 CPU 已回落，不代表动画峰值。
-- ✅ App 没有网络轮询、后台服务、常驻 Timer 或无限图表动画；进入后台后 Compose 动画不再持续绘制。
-- ✅ 100、1000、10000 条账单数据库替换与读回通过。
+- ✅ 1.0.3 正式包安装后首次冷启动：1,445ms。
+- ✅ 随后 3 次冷启动：1,103ms、1,162ms、1,202ms，中位数 1,162ms。
+- ✅ 启动后进程存活，冒烟窗口无 App FATAL/ANR。
+- ✅ 压力结束后的瞬时 CPU 样本约 0%～0.1%，只说明静止后已回落，不代表动画峰值。
+- ✅ App 没有网络轮询、后台服务、常驻 Timer 或无限图表动画；进入后台后 Compose 动画不会继续主动绘制。
+- ✅ 100 笔账单迁移保留测试通过；原有 100/1,000/10,000 条数据读写压力路径继续保留。
 
-## 已完成的性能约束
+## 已实施的性能约束
 
-- 主题、Glass、Sound、Haptic 由单一 StateFlow 驱动，避免 UI 与引擎重复状态和无效重组。
-- Pager 使用官方 `HorizontalPager`；记账不作为隐藏页面参与 Pager 预组合。
-- Bottom Lens 只维护单一动画位置，拖动跨过“记账”不会创建 Sheet。
-- 统计日期范围直接在 SQLite 查询，避免先读取全部账单再在 UI 过滤。
-- Donut 默认最多 6 个扇区，避免分类增多后大量 Path、颜色和图例。
-- SoundPool 一次预加载，点击不重复创建 MediaPlayer。
-- Glass OFF、Reduced Motion、系统省电和视觉质量可降低材质与动画成本。
-- R8 和资源收缩启用；正式 APK 为 4,829,042 字节。
+- Pager 的 `beyondViewportPageCount=0`，只组合当前所需页面；记账不是隐藏 Pager 页面。
+- 底栏拖动只保存最新绝对位置，使用 conflated command，避免指针采样堆积造成 Lens 落后。
+- Glass Lens 只有一个连续实例；拖过“记账”不会创建 Sheet。
+- 月趋势先在规则层补零并汇总，UI 只绘制最终点集。
+- 统计日期范围和分类查询在 SQLite 执行，不在 UI 读取全部账单后过滤。
+- 分类颜色使用 `mutableLongStateOf`，最终 Lint 无装箱性能提示。
+- 分类图集复用一张压缩资源，不为每个分类重复解码大图。
 
 ## 工具覆盖
 
 | 方法 | 状态 |
 | --- | --- |
-| `dumpsys gfxinfo` | ✅ ON/OFF、Sheet、Tab、Lens Drag 已采样 |
+| `dumpsys gfxinfo` | ✅ Glass ON/OFF、Sheet、Lens Drag 已采样 |
 | `dumpsys meminfo` / `cpuinfo` | ✅ 已采样进程快照 |
-| `am start -W` | ✅ Release 冷启动 622ms |
-| 30 项模拟器 UI/手势/截图测试 | ✅ 全部通过 |
-| 100/1000/10000 数据库测试 | ✅ 通过 |
+| `am start -W` | ✅ 1.0.3 Release 冷启动 4 次 |
+| 38 项模拟器 UI/手势/截图测试 | ✅ 全部通过 |
+| Release Lint / R8 / 资源收缩 | ✅ 通过 |
 | Android Studio Profiler | ⚠️ NOT TESTED |
 | Perfetto 长时间 Trace | ⚠️ NOT TESTED |
 | 独立 Macrobenchmark 模块 | ⚠️ NOT IMPLEMENTED |
-| 真机电池/温度/120Hz | ⚠️ NEEDS REAL DEVICE VERIFICATION |
+| 真机电池/温度/90/120Hz | ⚠️ NEEDS REAL DEVICE VERIFICATION |
 
 ## 真机复测建议
 
-1. 安装 `手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
-2. 分别在 Glass ON/OFF 下拖动底栏、切页和打开记账面板各 20 次。
-3. 用 Android Studio Profiler 或 Perfetto 记录 5 分钟 CPU、内存和帧时间。
-4. 导入 1000 条账单后检查首页、统计和账单滚动。
-5. 用系统电池页观察至少 30 分钟；若主力手机掉帧，先选“自动”或关闭 Liquid Glass，账本功能不受影响。
+1. 安装 `手机安装包/黑马记账-Android-正式版-1.0.3.apk`。
+2. 分别在 Glass ON/OFF 下拖动底栏、切页和打开快速记账各 20 次。
+3. 在 Android Studio Profiler 或 Perfetto 记录 5 分钟 CPU、内存和帧时间。
+4. 用系统电池页观察至少 30 分钟；如果主力手机掉帧，优先选“自动”或关闭 Liquid Glass，记账功能不受影响。

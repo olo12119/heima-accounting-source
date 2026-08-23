@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -122,6 +123,7 @@ fun <T> GlassSegmentedControl(
                         .semantics {
                             contentDescription = "$accessibilityLabel：$label"
                             stateDescription = if (isSelected) "已选中" else "未选中"
+                            this.selected = isSelected
                         }
                         .clickable(
                             interactionSource = interaction,

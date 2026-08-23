@@ -1,70 +1,67 @@
-# 黑马记账 Android 1.0.2 最终发布报告
+# 黑马记账 Android 1.0.3 最终发布报告
 
 ## 发布结论
 
-- ✅ 正式版本：`1.0.2`，版本号 `102`，包名 `com.heima.accounting`。
-- ✅ 唯一推荐安装文件：`手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
-- ✅ APK 大小：4,829,042 字节；SHA-256：`1270f828c5dc43747e5e1587ca566c657a661ed9c211591691fc7ded69672e01`。
+- ✅ 正式版本：`1.0.3`，版本号 `103`，包名 `com.heima.accounting`。
+- ✅ 唯一推荐安装文件：`手机安装包/黑马记账-Android-正式版-1.0.3.apk`。
+- ✅ APK 大小：4,878,194 字节；SHA-256：`f6c2a2460f7f653964f6a24e788ae55494eda63f6cb40353d53104a0c341fa25`。
 - ✅ 最低 Android 10（API 29），目标 Android 17（API 37）。
-- ✅ 使用原项目发布密钥和 APK Signature Scheme v3 签名，模拟器覆盖安装成功。
-- ✅ 本轮未改变数据库表结构，不需要 Migration；没有删除、重建或伪造用户账单。
+- ✅ 使用原项目发布密钥和 APK Signature Scheme v3 签名，可覆盖同签名旧版。
+- ✅ 数据库从 v1 升级到 v2 使用增量 Migration，不删除、不重建用户账单。
 - ⚠️ 个人分发版本未上架应用商店，手机首次安装可能要求允许“安装未知应用”。
 
-## 本轮产品级修正
+## 1.0.3 的产品级修正
 
-### 独立深浅主题
+### 首页和统计
 
-- ✅ 建立 `AppThemeTokens`，分别管理背景、表面、文字、边框、玻璃、图表和状态颜色。
-- ✅ “澄澈蓝”和“自然治愈”各自拥有独立 Light/Dark Tokens；深色不再是浅色页面叠加黑色滤镜。
-- ✅ Dark Glass 降低白色 Bloom 和大面积高光，改用深灰蓝 Tint、局部边缘高光和更高文字对比。
-- ✅ Glass OFF 使用同主题的普通 Material Surface，布局、层级和功能不改变。
+- 本月趋势固定从当月 1 日连续绘制到今天；无账日期补零，空数据是基线，单日数据是点，两日以上才绘制曲线、面积和最新点。
+- 统计首次进入默认“今日”，本次运行中记住用户最后选择；未来日期在界面和业务规则两层禁止选择。
+- 首页预算卡可直接进入预算页；统计和首页继续只读取真实账单，不创建示例账目。
 
-### 删除、导航与反馈
+### 分类系统
 
-- ✅ 删除提示改为一次性事件和 `SnackbarHostState`：约 4 秒自动消失，可撤销恢复；新删除会结束旧提示，不因重组重新计时。
-- ✅ 首页、统计、预算、我的使用原生 `HorizontalPager` 左右滑动；“记账”仍是主操作，不是 Pager 页面。
-- ✅ 底部连续玻璃 Lens 可点击或按住拖动，松手吸附最近页面；经过“记账”不误弹，停在“记账”才打开快速记账。
-- ✅ Lens、页面、文字选中状态由同一 Pager 状态驱动，避免不同步。
-- ✅ Sound、Haptic、Visual Feedback 三套系统独立；声音使用预加载 `SoundPool`，不为每次点击创建播放器。
+- 支出一级分类扩充为 16 个，并继续保留完整收入分类和二级分类。
+- 分类管理新增“全部 / 支出 / 收入”，支持名称、图标、颜色、启用状态、一级/二级分类、排序、预设分类展示属性和自定义分类维护。
+- 预设分类的稳定编号、收支类型和上下级关系不会被编辑破坏；已有账单引用始终保留。
+- 分类图标使用统一组件、统一安全区域和项目已有 3D 图集；旧颜色数据提供兼容读取。
 
-### 设置单一状态源
+### 导航和主要操作
 
-- ✅ `SettingsRepository → ViewModel State → UI/Glass/Sound/Haptic` 单向流动。
-- ✅ `liquidGlassEnabled`、`soundEnabled`、`hapticEnabled`、`reduceMotionEnabled` 使用明确正向命名。
-- ✅ Liquid Glass、音效、触觉开启均为右侧强调色；关闭为左侧灰色。“减少动态效果”ON 仍正确表示减少动画。
-- ✅ 四项设置和金额隐私永久保存，Activity 重建及重新启动后仍一致。
+- 底部导航超过 Android 正常触摸阈值后立即进入水平拖动，不要求长按。
+- Lens、页面、图标和文字由同一 Pager 进度驱动，拖动距离与页面进度一一对应；经过“记账”位置不会误弹面板。
+- “记账”仍属于同一块连续底栏，但图标尺寸、品牌 Tint、高光和按压反馈比普通 Tab 更强，不回退为突兀的悬浮大圆球。
+- 二级页面采用可保存状态的前进/返回栈；系统返回、顶部返回和手势返回语义一致，回到列表后保留滚动位置。
 
-### 统计与真实数据
+### 数据兼容和迁移
 
-- ✅ 新增自定义单日/日期区间；使用自有中文 Glass Date Picker，不调用系统旧式日历。
-- ✅ 日期筛选转换为 `startDate/endDateExclusive` 并在 SQLite `WHERE` 中执行，不在 UI 层查询全部后过滤。
-- ✅ 环形图采用 Top 5 + 其他，小于 3% 的细分类优先归并；“其他”可展开完整明细，数据不丢失。
-- ✅ 分类颜色使用稳定映射，并分别适配浅色/深色；点击扇区会突出分类并展示对应真实账单。
-- ✅ 财务分析继续只读取真实账单和预算规则，不生成投资建议或虚假结论。
+- 数据库版本升级为 v2，只用 `INSERT OR IGNORE` 补齐缺失预设分类，不覆盖用户修改和自定义分类。
+- 迁移测试以 100 笔账单、多个自定义一级/二级分类和预算为样本，升级后数量、金额总和、引用关系和预算完全一致。
+- 金额继续以整数“分”保存；SQLite 保持外键、WAL、索引、事务和完整性检查。
+
+### 视觉和模态层级
+
+- 浅色、深色、Liquid Glass ON/OFF 和减少动态效果均保持相同布局与完整功能。
+- 分类编辑器复用统一模态玻璃框架，增加 Dim 和内容保护，修复背景文字穿透、Glass-on-Glass 发白与层级混乱。
+- 最终逐屏检查首页、统计、快速记账、我的、分类列表、分类编辑器和深色首页。
 
 ## 最终架构
 
 ```text
-app（页面、HorizontalPager、一次性事件、交互反馈）
-├─ core:designsystem（独立主题 Tokens、Glass 与降级组件）
-├─ core:domain（金额、日期范围、Top5+其他、财务洞察）
-├─ core:data（SettingsRepository、仓库、CSV、备份）
-└─ core:database（SQLite、范围查询、事务、完整性检查）
+app（Compose 页面、Pager、模态导航、一次性事件与交互反馈）
+├─ core:designsystem（主题 Tokens、Glass 与兼容降级组件）
+├─ core:domain（金额、日期、趋势、分类和财务规则）
+├─ core:data（Repository、设置、CSV 与备份）
+└─ core:database（SQLite、v1→v2 Migration、事务和范围查询）
 ```
 
-- 金额仍以整数“分”保存。
-- SQLite 保持外键、WAL、索引、事务和完整性检查。
-- App 不需要账号，也不申请网络、定位、通讯录、相机或麦克风权限。
-
-## 最终验收
+## 最终验证
 
 - ✅ Release Lint：`No issues found`。
-- ✅ JVM 单元/规则测试：26/26 通过。
-- ✅ Android 16 模拟器数据库/UI/手势/截图测试：30/30 通过。
-- ✅ 100、1000、10000 条账单替换与读回通过。
-- ✅ R8 Release、资源压缩、zipalign、v3 签名、版本识别、覆盖安装和冷启动冒烟通过。
-- ✅ 正式包冷启动采样：622ms；启动后进程存活，日志窗口无 App FATAL/ANR。
-- ⚠️ 模拟器高压采样中，Glass ON 的底栏拖动 Jank 为 9.66%，快速记账开关为 15.71%；这不是 120Hz 真机结论，详见 `PERFORMANCE_REPORT.md`。
-- ⚠️ 真实手机扬声器音色、触觉手感、耗电、温升和 90/120Hz 表现仍为 `NEEDS REAL DEVICE VERIFICATION`。
+- ✅ JVM 单元/规则测试：34/34 通过。
+- ✅ Android 16 模拟器数据库/UI/手势/截图测试：38/38 通过。
+- ✅ R8 Release、资源收缩、zipalign、APK v3 验签、版本识别和覆盖安装通过。
+- ✅ 正式包冷启动 3 次采样：1,103ms、1,162ms、1,202ms；启动日志无 App FATAL/ANR。
+- ⚠️ Liquid Glass ON 的模拟器底栏拖动高压测试 Jank 为 11.97%，OFF 为 6.94%；这是真实差异，不伪装成理想结果。
+- ⚠️ 真机扬声器、触觉手感、耗电、温升和 90/120Hz 表现仍为 `NEEDS REAL DEVICE VERIFICATION`。
 
-详细结果见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
+详细结果见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和 `THIRD_PARTY_NOTICES.md`。
