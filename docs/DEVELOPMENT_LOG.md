@@ -1504,3 +1504,54 @@ testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
 - 本轮只同步私有源码和文档，不上传 APK，也未实现 App 在线更新。
 - GitHub 仓库仍保持私有；签名密钥、账单数据库、Android Studio 本机配置和发布 APK 均不在仓库中。
+
+## 2026-08-24：Android 1.1.0 UI / Motion / Material 专项定型
+
+### 需求背景
+
+用户要求在不增加登录、云同步等无关功能的前提下，对现有 Android 产品做一次系统性的 UI、动效和材质升级；重点不是局部换色，而是建立统一 Design System，并对指定的 55 项要求逐条查验。本次还作为未来免费 GitHub 在线更新的基础版本。
+
+### 实现范围
+
+1. 阅读 Kyant AndroidLiquidGlass、Haze、Qm LiquidGlassView、FlexibleBottomSheet、Compose Samples、Calendar、Vico、Reorderable、Material Motion 和 Shadow Gadgets 的真实源码，记录依赖、局部重写与只研究三类决策。
+2. 新增统一 Material / Motion 系统：七种语义 Surface、四档 Glass Quality、四级 Shadow、Typography 角色、90/150/220/320ms 时长和统一 Spring。
+3. 首页、统计、预算、我的、管理页、底栏、快速记账、日历和弹窗改用公共材质角色，减少 Card Soup 与 Glass-on-Glass。
+4. 底栏继续保持直接拖动和共享 Pager；“记账”仍是同一连续底栏中最醒目的 Primary Action。
+5. 快速记账使用单一连续进度联动背景、Scrim、Sheet、Handle 和内容；不改变一级分类快速保存与可选二级分类。
+6. 统计趋势增加触摸 Marker；Donut 保持 Top 5 + 其他并支持选中反馈；日历增加月份 Swipe、未来日期限制和可访问说明。
+7. 分类排序增加抬升、缩放、阴影和跨位触觉；Glass OFF、Reduce Motion、节电与温度降级统一接入。
+8. 新增手动 GitHub Releases 更新检查，版本提升到 1.1.0（110）；不静默安装、不后台轮询、不上传账单。
+
+### 数据兼容与安全
+
+- 本轮不修改 SQLite Schema，不需要 Migration；既有账目、分类、预算和设置原样保留。
+- 更新只在用户点击时请求 `api.github.com` 的公开版本 JSON，下载由系统浏览器完成。
+- 正式 APK 使用原证书签名并验证 v3，可覆盖 1.0.3；`.local-signing`、口令和 APK 继续排除 Git。
+
+### 真实失败与修复
+
+1. Shadow Gadgets 首次使用了错误仓库名并得到 404；核实后改为 `zed-alpha/shadow-gadgets`，失败目录未进入项目。
+2. 模拟器旧 `.dev` 测试外壳签名与当前测试包冲突；只清理模拟器测试包后从头执行 40 项通过，没有触碰正式账本。
+3. Compose 测试事件无法可靠穿过 Dialog 子节点验证月份横滑；没有保留会制造假失败的测试，改用真实 Android 坐标 Swipe 确认月份从 2026年8月切到 2026年7月。
+4. 首次最终构建因受限环境无法写 D 盘 Gradle 锁文件；获准调用现有 D 盘工具链后成功，没有移动项目或修改系统 PATH。
+5. 一次性能脚本并行执行互相停止 App 并导致模拟器离线；该数据作废，报告只保留可解释的压力样本和真实限制。
+
+### 最终验证
+
+```text
+.\gradlew.bat test lintRelease :app:assembleRelease --no-daemon
+.\gradlew.bat :app:connectedDebugAndroidTest --no-daemon
+```
+
+- JVM：38/38 通过；Android 模拟器：40/40 通过。
+- Release Lint、R8、资源收缩和构建成功。
+- 最终 APK 为 4,894,578 字节，SHA-256 为 `D71A5FAD081CE222ABE47C1E9BD845AA81DF0A12FBB26101AFA243480E773FF0`。
+- v3 正式签名验证通过；覆盖安装识别 `versionCode=110`、`versionName=1.1.0`；冷启动 971ms，无 App FATAL/ANR。
+- 55 项自查为 52 项 ✅、3 项 ⚠️、0 项 ❌；⚠️ 均为真机硬件或公开发布状态边界。
+
+### 交付与限制
+
+- 唯一推荐 APK：`手机安装包/黑马记账-Android-正式版-1.1.0.apk`。
+- 完整专项报告：根目录 `UI_MOTION_MATERIAL_REPORT.md`。
+- 模拟器不能代替真实扬声器、触觉、电池、温升、厂商 GPU 与 90/120Hz 验收。
+- App 内更新只有在公开 GitHub Releases 仓库存在并发布对应 APK 后才能形成完整闭环；私有源码仓库继续保持私有。

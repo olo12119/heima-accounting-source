@@ -1,4 +1,4 @@
-# 黑马记账 Android 1.0.3
+# 黑马记账 Android 1.1.0
 
 这是与 Windows 桌面版分开的 Android 原生正式工程。
 
@@ -17,11 +17,12 @@
 - 首页、统计、预算、账单、分类、数据管理和设置。
 - CSV、带 SHA-256 的完整 JSON 备份和事务恢复。
 - 两套主题、Light/Dark/System、Liquid Glass、音效、触觉、隐私金额。
-- 无虚假账单、无网络权限、无后台服务。
+- 无虚假账单、无后台服务；仅手动“检查更新”使用网络，不上传账单。
+- 统一 Material / Motion Token、语义 Surface、触摸图表、中文 Glass Calendar 和 8 组合视觉回归。
 
 ## 打开与构建
 
-普通用户安装根目录 `手机安装包/黑马记账-Android-正式版-1.0.3.apk`。
+普通用户安装根目录 `手机安装包/黑马记账-Android-正式版-1.1.0.apk`。
 
 开发者从根目录双击 `00-用Android Studio查看手机版.cmd`，或按 `../../docs/android/BUILD_AND_TEST.md` 使用 D 盘工具链构建。
 

@@ -4,12 +4,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +41,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,12 +52,15 @@ import com.heima.accounting.designsystem.GlassFieldSurface
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.HeimaMotionTokens
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.PressableGlassSurface
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 import com.heima.accounting.domain.DateRange
 import com.heima.accounting.domain.FinanceRules
 
@@ -144,6 +148,7 @@ fun LiquidGlassDatePicker(
     var selectedDate by remember(initialDate) { mutableStateOf(initialDate) }
     var shownMonth by remember(initialDate) { mutableStateOf(YearMonth.from(initialDate)) }
     var direction by remember { mutableIntStateOf(1) }
+    val today = remember { LocalDate.now() }
     val chineseFull = remember { DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE) }
 
     HeimaDialogFrame(onDismiss, modifier = Modifier.widthIn(max = 390.dp)) {
@@ -171,22 +176,22 @@ fun LiquidGlassDatePicker(
             Spacer(Modifier.height(7.dp))
             AnimatedContent(
                 targetState = shownMonth,
-                transitionSpec = {
-                    if (motion.reduceMotion) {
-                        fadeIn() togetherWith fadeOut()
-                    } else if (direction > 0) {
-                        (slideInHorizontally { it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { -it / 5 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { -it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { it / 5 } + fadeOut())
-                    }
-                },
+                modifier = Modifier
+                    .semantics { contentDescription = "日历月份，可左右滑动" }
+                    .monthSwipe(
+                        allowNext = true,
+                        onPrevious = { direction = -1; shownMonth = shownMonth.minusMonths(1) },
+                        onNext = { direction = 1; shownMonth = shownMonth.plusMonths(1) },
+                    ),
+                transitionSpec = { HeimaMotionTokens.sharedAxisX(direction > 0, motion.reduceMotion, 46) },
                 label = "calendar_month",
             ) { month ->
                 CalendarMonthGrid(
                     month = month,
                     selectedStart = selectedDate,
                     selectedEnd = null,
-                    today = LocalDate.now(),
+                    today = today,
+                    maxSelectableDate = today,
                     onSelected = {
                         onSelectionFeedback()
                         selectedDate = it
@@ -280,15 +285,14 @@ fun LiquidGlassDateRangePicker(
             Spacer(Modifier.height(7.dp))
             AnimatedContent(
                 targetState = shownMonth,
-                transitionSpec = {
-                    if (motion.reduceMotion) {
-                        fadeIn() togetherWith fadeOut()
-                    } else if (direction > 0) {
-                        (slideInHorizontally { it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { -it / 5 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { -it / 5 } + fadeIn()) togetherWith (slideOutHorizontally { it / 5 } + fadeOut())
-                    }
-                },
+                modifier = Modifier
+                    .semantics { contentDescription = "日历月份，可左右滑动" }
+                    .monthSwipe(
+                        allowNext = shownMonth < YearMonth.from(today),
+                        onPrevious = { direction = -1; shownMonth = shownMonth.minusMonths(1) },
+                        onNext = { direction = 1; shownMonth = shownMonth.plusMonths(1) },
+                    ),
+                transitionSpec = { HeimaMotionTokens.sharedAxisX(direction > 0, motion.reduceMotion, 46) },
                 label = "statistics_calendar_month",
             ) { month ->
                 CalendarMonthGrid(
@@ -479,6 +483,7 @@ internal fun HeimaDialogFrame(
                 cornerRadius = 28.dp,
                 elevation = 18.dp,
                 backdropBlur = false,
+                role = HeimaSurfaceRole.OVERLAY,
             ) {
                 Box(
                     Modifier
@@ -507,9 +512,39 @@ private fun DialogAction(
         modifier.height(44.dp).semantics { contentDescription = "对话框操作：$label" },
         15.dp,
         backdropBlur = false,
+        role = HeimaSurfaceRole.INTERACTIVE,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(label, color = accent ?: palette.textSecondary, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+private fun Modifier.monthSwipe(
+    allowNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+): Modifier = pointerInput(allowNext, onPrevious, onNext) {
+    val threshold = 48.dp.toPx()
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var distance = 0f
+        var lastX = down.position.x
+        var horizontalDrag = false
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            distance += change.position.x - lastX
+            lastX = change.position.x
+            if (abs(distance) > viewConfiguration.touchSlop) horizontalDrag = true
+            if (horizontalDrag) change.consume()
+            if (!change.pressed) break
+        }
+        if (horizontalDrag) {
+            when {
+                distance > threshold -> onPrevious()
+                distance < -threshold && allowNext -> onNext()
+            }
         }
     }
 }

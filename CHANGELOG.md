@@ -2,6 +2,15 @@
 
 这里记录已经完成测试并作为正式版本交付的主要变化；日常开发过程请查看 Git 提交记录。
 
+## [1.1.0] UI / Motion / Material 正式升级
+
+- 建立 Hero、Metric、Insight、Chart、List、Interactive、Overlay 七种语义 Surface 和统一 Glass 质量分级。
+- 统一按压、Lens、Sheet、页面、图表和日期切换的 Motion Token 与 Spring，完整接入减少动态效果。
+- 深化连续底栏、主记账入口和快速记账 Sheet 的因果动画，保持一级分类快速保存与可选二级分类。
+- 统计趋势新增触摸 Marker；Donut 保持 Top 5 + 其他并支持选中反馈；中文日历增加月份 Swipe 与未来日期限制。
+- 新增手动检查 GitHub Releases 更新；只在用户点击时联网，不上传账单，不申请静默安装权限。
+- 38 项 JVM 测试、40 项 Android 模拟器测试、Release Lint、R8 构建、正式签名与覆盖安装通过。
+
 ## [1.0.3] Android 正式版
 
 - 完善一级、二级及自定义分类，并保证旧账单与分类关系在数据库迁移后继续保留。

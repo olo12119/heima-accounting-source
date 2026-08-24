@@ -1,63 +1,46 @@
-# 黑马记账 Android 1.0.3 性能报告
+# 黑马记账 Android 1.1.0 性能报告
 
-## 测试环境与边界
+## 环境与结论边界
 
-- Android Studio AVD：`Heima_Android_16`，Android 16 / API 36，1080×2400，模拟 60Hz。
-- Debug 用自动手势、`dumpsys gfxinfo`、`meminfo` 和启动计时；R8 Release 用于最终冷启动与冒烟。
-- 模拟器适合发现版本间趋势，不代表真实手机 GPU、90/120Hz、耗电或温升。
+- Android Studio AVD：`Heima_Android_16`，Android 16 / API 36。
+- 最终发布包使用 R8 与资源收缩；模拟器可检查回归和明显阻塞，但不能代表真实手机 GPU、电池、温升和高刷新率。
+- 本轮把实时 Glass 收敛到共享 Backdrop 和少量高等级交互表面；普通 Row、数字键和正文不重复建立全尺寸 Blur。
 
-## 高压场景采样
+## 实测结果
 
-| 场景 | Glass | 总帧 | 现代 Jank | P50/P90/P95/P99 | GPU P50/P90/P95 | 总 PSS |
-| --- | --- | ---: | ---: | --- | --- | ---: |
-| 快速记账打开/关闭 12 次 | ON | 327 | 44（13.46%） | 21/34/93/117ms | 15/21/24ms | 107,479 KB |
-| 快速记账打开/关闭 12 次 | OFF | 320 | 42（13.12%） | 18/34/81/117ms | 14/19/22ms | 103,075 KB |
-| 底栏 Lens 直接拖动 8 轮 | ON | 702 | 84（11.97%） | 34/48/81/150ms | 17/22/23ms | 119,780 KB |
-| 底栏 Lens 直接拖动 8 轮 | OFF | 720 | 50（6.94%） | 25/38/57/117ms | 17/21/22ms | 118,223 KB |
+| 项目 | 结果 | 解释 |
+| --- | --- | --- |
+| 正式 1.1.0 冷启动 | ✅ 971ms | `am start -W`，启动日志无 App FATAL/ANR |
+| 最终 APK 大小 | ✅ 4,894,578 字节 | R8 Release + v3 正式签名 |
+| JVM 测试 | ✅ 38/38 | 规则、版本、材质质量解析 |
+| Android 模拟器测试 | ✅ 40/40 | 数据库、UI、视觉组合和手势 |
+| Headless SwiftShader Sheet 压测 | ⚠️ 164 帧，144 Jank（87.80%） | P50/P90/P95/P99 为 133/200/250/600ms；该模拟器渲染器过载，只能作为无崩溃压力哨兵，不能代表手机 |
+| 压测内存快照 | ⚠️ 112,702 KB | 同一 Headless 场景，只记录不做真机承诺 |
+| 导航并行压测 | ⚠️ INVALID | 脚本竞争并导致模拟器离线，结果已废弃 |
+| 真机 GPU/电池/温升/120Hz | ⚠️ NOT TESTED | 必须真实设备验证 |
 
-说明：
+## 已实施约束
 
-- 脚本连续快速操作，压力高于普通用户节奏；数值用于回归，不承诺真机帧率。
-- 模拟器 GPU P99 偶发返回 4950ms 哨兵异常值，因此表中只采用 P50/P90/P95。
-- Glass OFF 的底栏拖动 Jank 明显较低，证明开关确实减少实时材质成本，不存在开关反转。
-- Glass ON 的底栏拖动仍未达到理想目标；产品保留自动质量、省电和完全关闭 Glass 的降级路线，并必须在主力真机继续验收。
+- `HeimaMaterialSystem` 集中解析 High/Balanced/Performance/Disabled，避免每个页面自行叠 Glass。
+- 同一页面共享 Backdrop；Glass OFF、节电、严重温度状态和旧系统使用低成本回退。
+- Sheet 使用单一 `visibilityProgress`，避免多套动画状态互相追赶和重复重组。
+- Chart 聚合与颜色映射保持稳定；拖动只更新 Marker 所需状态。
+- Pager、Bottom Lens 和页面选中态共享同一个 `PagerState`，不维护三套可能错位的状态。
+- 没有后台更新轮询、后台服务、无限 Timer 或常驻装饰动画；检查更新只在用户点击时执行。
 
-## 启动、CPU 与数据规模
+## 未伪造的数据
 
-- ✅ 1.0.3 正式包安装后首次冷启动：1,445ms。
-- ✅ 随后 3 次冷启动：1,103ms、1,162ms、1,202ms，中位数 1,162ms。
-- ✅ 启动后进程存活，冒烟窗口无 App FATAL/ANR。
-- ✅ 压力结束后的瞬时 CPU 样本约 0%～0.1%，只说明静止后已回落，不代表动画峰值。
-- ✅ App 没有网络轮询、后台服务、常驻 Timer 或无限图表动画；进入后台后 Compose 动画不会继续主动绘制。
-- ✅ 100 笔账单迁移保留测试通过；原有 100/1,000/10,000 条数据读写压力路径继续保留。
+以下项目当前明确为 `NEEDS REAL DEVICE VERIFICATION`：
 
-## 已实施的性能约束
+- FPS/Jank 的真实手机数值和 90/120Hz 表现。
+- GPU、CPU 峰值、稳定内存和厂商系统差异。
+- 30 分钟以上耗电、温升与 Thermal 降级。
+- 触觉手感和扬声器音色。
+- Android Studio Profiler、长时间 Perfetto 和独立 Macrobenchmark 尚未形成可靠最终数据。
 
-- Pager 的 `beyondViewportPageCount=0`，只组合当前所需页面；记账不是隐藏 Pager 页面。
-- 底栏拖动只保存最新绝对位置，使用 conflated command，避免指针采样堆积造成 Lens 落后。
-- Glass Lens 只有一个连续实例；拖过“记账”不会创建 Sheet。
-- 月趋势先在规则层补零并汇总，UI 只绘制最终点集。
-- 统计日期范围和分类查询在 SQLite 执行，不在 UI 读取全部账单后过滤。
-- 分类颜色使用 `mutableLongStateOf`，最终 Lint 无装箱性能提示。
-- 分类图集复用一张压缩资源，不为每个分类重复解码大图。
+## 真机验收步骤
 
-## 工具覆盖
-
-| 方法 | 状态 |
-| --- | --- |
-| `dumpsys gfxinfo` | ✅ Glass ON/OFF、Sheet、Lens Drag 已采样 |
-| `dumpsys meminfo` / `cpuinfo` | ✅ 已采样进程快照 |
-| `am start -W` | ✅ 1.0.3 Release 冷启动 4 次 |
-| 38 项模拟器 UI/手势/截图测试 | ✅ 全部通过 |
-| Release Lint / R8 / 资源收缩 | ✅ 通过 |
-| Android Studio Profiler | ⚠️ NOT TESTED |
-| Perfetto 长时间 Trace | ⚠️ NOT TESTED |
-| 独立 Macrobenchmark 模块 | ⚠️ NOT IMPLEMENTED |
-| 真机电池/温度/90/120Hz | ⚠️ NEEDS REAL DEVICE VERIFICATION |
-
-## 真机复测建议
-
-1. 安装 `手机安装包/黑马记账-Android-正式版-1.0.3.apk`。
-2. 分别在 Glass ON/OFF 下拖动底栏、切页和打开快速记账各 20 次。
-3. 在 Android Studio Profiler 或 Perfetto 记录 5 分钟 CPU、内存和帧时间。
-4. 用系统电池页观察至少 30 分钟；如果主力手机掉帧，优先选“自动”或关闭 Liquid Glass，记账功能不受影响。
+1. 安装 `手机安装包/黑马记账-Android-正式版-1.1.0.apk`。
+2. 分别在 Glass ON/OFF 下连续拖动底栏、打开记账、切换统计和月份各 20 次。
+3. 打开“减少动态效果”后复测，确认反馈仍即时但 Morph 明显减少。
+4. 在 Android Studio Profiler 或 Perfetto 记录至少 5 分钟；再用系统电池页观察 30 分钟以上。

@@ -51,6 +51,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.HeimaMotionTokens
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.CategoryChartSlice
@@ -162,12 +164,12 @@ fun StatisticsScreen(
             AnimatedContent(
                 targetState = summary,
                 transitionSpec = {
-                    fadeIn(tween(if (motion.reduceMotion) 70 else 180)) togetherWith
-                        fadeOut(tween(if (motion.reduceMotion) 60 else 120))
+                    fadeIn(tween(if (motion.reduceMotion) HeimaMotionTokens.Instant else HeimaMotionTokens.Standard)) togetherWith
+                        fadeOut(tween(if (motion.reduceMotion) 60 else HeimaMotionTokens.Fast))
                 },
                 label = "statistics_summary",
             ) { visibleSummary ->
-                GlassSurface(Modifier.fillMaxWidth(), 28.dp, backdropBlur = true) {
+                GlassSurface(Modifier.fillMaxWidth(), 28.dp, backdropBlur = true, role = HeimaSurfaceRole.HERO) {
                     Column(Modifier.padding(22.dp)) {
                         Text("支出总额", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(7.dp))
@@ -205,7 +207,7 @@ fun StatisticsScreen(
         }
         item { SectionHeading("收支结构") }
         item {
-            GlassSurface(Modifier.fillMaxWidth(), 27.dp, backdropBlur = false) {
+            GlassSurface(Modifier.fillMaxWidth(), 27.dp, backdropBlur = false, role = HeimaSurfaceRole.CHART) {
                 if (slices.isEmpty()) {
                     EmptyIllustration("还没有可统计的支出", Modifier.fillMaxWidth().padding(vertical = 22.dp))
                 } else {
@@ -271,7 +273,7 @@ fun StatisticsScreen(
         if (selectedTransactions.isNotEmpty()) {
             item { SectionHeading("所选分类账单") }
             items(selectedTransactions.take(8), key = { "selected-${it.id}" }) { transaction ->
-                GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false) {
+                GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                     TransactionRow(
                         transaction = transaction,
                         snapshot = snapshot,
@@ -284,7 +286,7 @@ fun StatisticsScreen(
         }
         item { SectionHeading("消费趋势") }
         item {
-            GlassSurface(Modifier.fillMaxWidth(), 25.dp, backdropBlur = false) {
+            GlassSurface(Modifier.fillMaxWidth(), 25.dp, backdropBlur = false, role = HeimaSurfaceRole.CHART) {
                 Column(Modifier.padding(20.dp)) {
                     AnimatedTrendChart(summary.dailyTotals, Modifier.fillMaxWidth().height(136.dp))
                     if (summary.dailyTotals.isEmpty()) {
@@ -303,7 +305,7 @@ fun StatisticsScreen(
                 val index = summary.categoryTotals.indexOf(total)
                 val category = snapshot.category(total.categoryId)
                 val categoryColor = category?.colorArgb?.let(::categoryColorFromArgb) ?: palette.brand
-                GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false) {
+                GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                     Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${index + 1}. ${category?.name ?: "未分类"}", color = palette.textPrimary)
@@ -401,7 +403,7 @@ private fun CustomRangeHeader(range: DateRange, onEdit: () -> Unit, onReset: () 
     } else {
         "${range.startInclusive.format(formatter)} - ${range.endInclusive.format(formatter)}"
     }
-    GlassSurface(Modifier.fillMaxWidth(), 18.dp, backdropBlur = false) {
+    GlassSurface(Modifier.fillMaxWidth(), 18.dp, backdropBlur = false, role = HeimaSurfaceRole.INTERACTIVE) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -478,6 +480,7 @@ private fun OtherCategoriesSheet(
                 cornerRadius = 28.dp,
                 elevation = 18.dp,
                 backdropBlur = false,
+                role = HeimaSurfaceRole.OVERLAY,
             ) {
                 Column(
                     Modifier.fillMaxWidth().padding(22.dp),

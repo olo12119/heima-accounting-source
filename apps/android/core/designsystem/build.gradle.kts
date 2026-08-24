@@ -41,4 +41,5 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.backdrop)
+    testImplementation(libs.junit4)
 }

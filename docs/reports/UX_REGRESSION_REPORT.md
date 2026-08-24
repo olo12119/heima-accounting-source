@@ -1,42 +1,51 @@
-# 黑马记账 Android 1.0.3 UX 回归报告
+# 黑马记账 Android 1.1.0 UX 回归报告
 
 | 验收项 | 结果 | 说明 |
-| --- | --- | --- |
-| 旧版第二轮交互与深色模式 | ✅ 快速回归 | 主题 Tokens、Snackbar、设置方向、自定义日期和 Top5+其他没有倒退 |
-| 1. 月趋势连续性 | ✅ | 月初至今天、补零、空/单点/多点状态和数据更新完成 |
-| 2. 未来日期限制 | ✅ | 统计 UI 和业务层双重禁止，当前月下一月不可点 |
-| 3. 统计默认今日 | ✅ | 首次今日；本次 App 生命周期保留用户选择 |
-| 4. 二级页面导航 | ✅ | 前进/返回、系统 Back、顶部 Back 和滚动恢复统一 |
-| 5. 分类“全部”筛选 | ✅ | 全部、支出、收入可切换且 Lens 同步 |
-| 6. Category Editor | ✅ | 名称、图标、颜色、启用、类型、排序、一级/二级和自定义维护完整 |
-| 7. 分类视觉一致性 | ✅ | 3D 图集、统一安全区、视觉中心和颜色兼容完成 |
-| 8. 16 个支出大类 | ✅ | 升级只补缺失，不覆盖用户已有数据 |
-| 9. v1→v2 Migration | ✅ | 100 笔账单、自定义分类、关系和预算完全保留 |
-| 10. 首页预算入口 | ✅ | 点击预算卡进入预算页，返回后首页状态保留 |
-| 11. 第 41 项直接拖动 | ✅ | 不需长按；触摸阈值后立即跟手，短距离不误触，经过记账不误弹 |
-| 12. 第 42 项主记账按钮 | ✅ | 同一连续底栏内提高图标、Tint、高光和按压优先级，不做独立大球 |
-| 13. 模态玻璃层级 | ✅ | 分类编辑器背景穿透已在截图检查中发现并修复 |
-| 14. Reduced Motion / Glass OFF | ✅ | 功能、布局和主操作层级保持；昂贵材质与形变降低 |
+| --- | :---: | --- |
+| 统一 Material System | ✅ | 七种语义 Surface 和四档 Glass Quality 已接入公共组件 |
+| 统一 Motion System | ✅ | 时长、Spring、按压、Sheet、Lens、图表和父子页面集中管理 |
+| Card Soup | ✅ | 页面不再依赖同质大白卡，Hero/Metric/Chart/List 层级可区分 |
+| Continuous Bottom Bar | ✅ | 点击、Pager Swipe、Lens 直接拖动同步，记账仍最醒目 |
+| Quick Record | ✅ | Sheet 进度联动、背景降权、一级快速保存和可选二级分类保持 |
+| Glass Calendar | ✅ | 中文、未来禁用、单日/区间、按钮翻月和月份 Swipe |
+| Statistics | ✅ | 时间 Lens、Marker 拖动、Donut 交互、Top 5 + 其他 |
+| Category Management | ✅ | 统一图标安全区、拖柄、抬升、阴影、排序和触觉边界 |
+| Dark Mode | ✅ | 独立 Token，降低白雾与 Bloom，文字优先 |
+| Glass OFF | ✅ | 保持布局和层级，降低实时材质成本 |
+| Reduce Motion | ✅ | 8 种视觉组合均可渲染，新动效读取同一设置 |
+| Update Check | ✅ | 用户主动检查、浏览器下载、无静默安装与后台轮询 |
 
 ## 视觉矩阵
 
-- ✅ 首页：Light/Glass ON、Dark/Glass ON；Glass OFF 由行为与截图差异测试覆盖。
-- ✅ 统计：默认今日、分段 Lens、自定义日历入口和空状态。
-- ✅ 快速记账：背景 Dim、主 Sheet、一级分类、日期/备注和数字键盘。
-- ✅ 分类：全部筛选、3D 图标、预设编辑、颜色、启用和二级信息。
-- ✅ 我的：主题、四项体验设置、账本管理和 1.0.3 版本号。
-- ✅ 底栏：普通 Tab Lens 与 Primary Record Action 的连续性和光学优先级。
+- ✅ Light + Glass ON + Motion
+- ✅ Light + Glass ON + Reduce Motion
+- ✅ Light + Glass OFF + Motion
+- ✅ Light + Glass OFF + Reduce Motion
+- ✅ Dark + Glass ON + Motion
+- ✅ Dark + Glass ON + Reduce Motion
+- ✅ Dark + Glass OFF + Motion
+- ✅ Dark + Glass OFF + Reduce Motion
 
-## 交互矩阵
+上述 8 种组合由 Android UI 测试逐一切换并验证首页、底栏和主要操作仍可渲染；完整 Android 测试为 40/40。
 
-- ✅ 点击 Tab、滑动页面、直接拖动 Lens、拖一半返回、短距离不误触和跨越记账位置。
-- ✅ 页面、Lens、选中图标和文字由同一 Pager 状态驱动。
-- ✅ 分类长按排序与无障碍上下移动按钮同时保留。
-- ✅ 新动画尊重“减少动态效果”；Glass OFF 不改变信息架构。
+## 手势矩阵
 
-## 仍存在的边界
+- ✅ 主页面 Swipe、底部 Lens 直接 Drag、半程返回和跨多个 Tab。
+- ✅ 记账 Sheet Drag、关闭阈值、背景层级和快速重复开关。
+- ✅ Calendar 按钮换月和 Android 坐标水平 Swipe。
+- ✅ 分类排序 Drag 与跨位反馈。
+- ✅ Chart 点击/拖动 Marker；不会错误切换 Pager。
 
-- ⚠️ Glass ON 的模拟器底栏拖动 Jank 高于 OFF，详见 `PERFORMANCE_REPORT.md`。
-- ⚠️ 真机声音、震感、电池、温升和高刷新率为 `NEEDS REAL DEVICE VERIFICATION`。
+## 55 项结论
 
-结论：代码、数据库、交互、截图回归和发布门禁已通过；未验项目仅限模拟器无法替代的真实硬件体验。
+- ✅ 52 项已通过代码、文档或模拟器验收。
+- ⚠️ 3 项依赖真实设备或公开 Release 状态，详见根目录 `UI_MOTION_MATERIAL_REPORT.md`。
+- ❌ 0 项。
+
+## 仍需用户真机体验
+
+- ⚠️ 音效是否在你的手机扬声器上足够轻、清晰。
+- ⚠️ 触觉是否符合你的手机马达和个人偏好。
+- ⚠️ 高刷新率、长时间耗电与温升。
+
+这些不是被隐藏的失败，而是模拟器无法替代的真实硬件验收。

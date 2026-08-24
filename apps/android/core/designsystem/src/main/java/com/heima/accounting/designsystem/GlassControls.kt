@@ -3,11 +3,11 @@ package com.heima.accounting.designsystem
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 
 /** A single sliding selection surface shared by filters and two-way choices. */
 @Composable
@@ -58,6 +60,7 @@ fun <T> GlassSegmentedControl(
     require(options.isNotEmpty())
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
+    val glassQuality = HeimaMaterialSystem.quality()
     val selectedIndex = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     val shape = RoundedCornerShape(18.dp)
 
@@ -74,7 +77,7 @@ fun <T> GlassSegmentedControl(
         val targetX = slotWidth * selectedIndex
         val lensX by animateDpAsState(
             targetValue = targetX,
-            animationSpec = if (motion.reduceMotion) tween(80) else spring(dampingRatio = .88f, stiffness = 520f),
+            animationSpec = HeimaMotionTokens.snap(motion.reduceMotion),
             label = "glass_segment_lens",
         )
         val lensShape = RoundedCornerShape(14.dp)
@@ -85,7 +88,7 @@ fun <T> GlassSegmentedControl(
                 .fillMaxHeight()
                 .clip(lensShape)
                 .background(
-                    if (motion.liquidGlassEnabled) {
+                    if (glassQuality != GlassQuality.DISABLED) {
                         Brush.horizontalGradient(
                             listOf(
                                 palette.glassHighlight.copy(alpha = if (motion.darkTheme) .12f else .58f),
@@ -107,12 +110,12 @@ fun <T> GlassSegmentedControl(
                 val pressed by interaction.collectIsPressedAsState()
                 val pressScale by animateFloatAsState(
                     targetValue = if (pressed && !motion.reduceMotion) .97f else 1f,
-                    animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .88f, stiffness = 760f),
+                    animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
                     label = "glass_segment_press",
                 )
                 val color by animateColorAsState(
                     if (isSelected) palette.brand else palette.textSecondary,
-                    animationSpec = tween(if (motion.reduceMotion) 70 else 170),
+                    animationSpec = tween(if (motion.reduceMotion) HeimaMotionTokens.Instant else HeimaMotionTokens.Fast),
                     label = "glass_segment_text",
                 )
                 Box(
@@ -159,12 +162,12 @@ fun GlassToggle(
     val motion = HeimaTheme.motion
     val thumbX by animateDpAsState(
         targetValue = if (checked) 24.dp else 3.dp,
-        animationSpec = if (motion.reduceMotion) tween(70) else spring(dampingRatio = .88f, stiffness = 620f),
+        animationSpec = HeimaMotionTokens.snap(motion.reduceMotion),
         label = "glass_toggle_thumb",
     )
     val trackColor by animateColorAsState(
         targetValue = if (checked) palette.brand else palette.surfaceMuted,
-        animationSpec = tween(if (motion.reduceMotion) 70 else 160),
+        animationSpec = tween(if (motion.reduceMotion) HeimaMotionTokens.Instant else HeimaMotionTokens.Fast),
         label = "glass_toggle_track",
     )
     val interaction = remember { MutableInteractionSource() }
@@ -176,6 +179,25 @@ fun GlassToggle(
             .semantics {
                 this.contentDescription = contentDescription
                 stateDescription = if (checked) "已开启" else "已关闭"
+            }
+            .pointerInput(checked) {
+                var dragDistance = 0f
+                val threshold = 8.dp.toPx()
+                detectHorizontalDragGestures(
+                    onDragStart = { dragDistance = 0f },
+                    onHorizontalDrag = { change, delta ->
+                        dragDistance += delta
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        if (abs(dragDistance) >= threshold) {
+                            val requested = dragDistance > 0f
+                            if (requested != checked) onCheckedChange(requested)
+                        }
+                        dragDistance = 0f
+                    },
+                    onDragCancel = { dragDistance = 0f },
+                )
             }
             .toggleable(
                 value = checked,
@@ -226,7 +248,7 @@ fun GlassChip(
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (pressed && !motion.reduceMotion) .97f else 1f,
-        animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .88f, stiffness = 760f),
+        animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
         label = "glass_chip_press",
     )
     Box(

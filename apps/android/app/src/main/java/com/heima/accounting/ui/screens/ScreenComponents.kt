@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,6 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 
 @Composable
 internal fun ScreenHeading(
@@ -91,15 +92,13 @@ internal fun EntityCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val palette = HeimaTheme.palette
-    Surface(
+    GlassSurface(
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = palette.surface.copy(alpha = 0.96f),
-        shadowElevation = 5.dp,
-        tonalElevation = 0.dp,
-        content = { Box(Modifier.padding(20.dp)) { content() } },
-    )
+        cornerRadius = 24.dp,
+        elevation = 0.dp,
+        backdropBlur = false,
+        role = HeimaSurfaceRole.LIST,
+    ) { Box(Modifier.padding(20.dp)) { content() } }
 }
 
 @Composable

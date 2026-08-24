@@ -322,23 +322,54 @@ class NavigationAndRecordTest {
     }
 
     @Test
+    fun eightCoreAppearanceMaterialAndMotionCombinationsRender() {
+        composeRule.onNodeWithContentDescription("打开我的").performClick()
+        var rendered = 0
+        listOf("浅色", "深色").forEach { appearance ->
+            composeRule.onNodeWithContentDescription("设置选项：$appearance").performClick()
+            listOf(true, false).forEach { glassEnabled ->
+                setSwitch("Liquid Glass 开关", glassEnabled)
+                listOf(false, true).forEach { reduceMotionEnabled ->
+                    setSwitch("减少动态效果 开关", reduceMotionEnabled)
+                    composeRule.waitForIdle()
+                    val image = composeRule.onRoot().captureToImage()
+                    assertTrue(image.width > 0 && image.height > 0)
+                    rendered++
+                }
+            }
+        }
+        assertTrue("应覆盖 8 种核心组合", rendered == 8)
+    }
+
+    @Test
     fun customChineseDatePickerCanCancelAndConfirm() {
         val today = LocalDate.now()
         val nextMonth = today.plusMonths(1).withDayOfMonth(1)
+        val previousMonth = today.minusMonths(1).withDayOfMonth(1)
         composeRule.onNodeWithContentDescription("打开记账面板").performClick()
         composeRule.onNodeWithContentDescription("选择记账日期").performClick()
         composeRule.onNodeWithText("选择日期").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("下一个月").performClick()
         composeRule.onNodeWithText("${nextMonth.year}年${nextMonth.monthValue}月", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("${nextMonth.monthValue}月1日", substring = true).performClick()
+        composeRule.onNodeWithContentDescription("${nextMonth.monthValue}月1日", substring = true).assertIsNotEnabled()
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.onNodeWithContentDescription("选择记账日期").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("选择记账日期").performClick()
-        composeRule.onNodeWithContentDescription("下一个月").performClick()
-        composeRule.onNodeWithContentDescription("${nextMonth.monthValue}月1日", substring = true).performClick()
+        composeRule.onNodeWithContentDescription("上一个月").performClick()
+        composeRule.onNodeWithContentDescription("${previousMonth.monthValue}月1日", substring = true).performClick()
         composeRule.onNodeWithText("确定", substring = false).performClick()
-        composeRule.onNodeWithText("${nextMonth.monthValue}月1日", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("${previousMonth.monthValue}月1日", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun statisticsChartDragKeepsStatisticsPageActive() {
+        composeRule.onNodeWithContentDescription("打开统计").performClick()
+        composeRule.onNodeWithContentDescription("消费趋势图", substring = true).performTouchInput {
+            swipe(start = Offset(120f, centerY), end = Offset(right - 120f, centerY), durationMillis = 350)
+        }
+        composeRule.onNodeWithContentDescription("打开统计").assertIsSelected()
+        composeRule.onNodeWithContentDescription("消费趋势图", substring = true).assertIsDisplayed()
     }
 
     @Test

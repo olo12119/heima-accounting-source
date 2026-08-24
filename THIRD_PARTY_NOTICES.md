@@ -32,6 +32,13 @@
 - `android/nowinandroid`（Apache-2.0）：研究独立 Light/Dark Tokens、设置单向数据流和 Snackbar 事件。
 - `androidx/androidx`（Apache-2.0）：研究 HorizontalPager、PagerState、手势和触觉接口。
 - `android/performance-samples`（Apache-2.0）：研究 Jank、启动和 Macrobenchmark 边界。
+- `chrisbanes/haze`（Apache-2.0）：研究 Glass Style、Fallback 和性能分级；未引入 Haze 依赖。
+- `skydoves/FlexibleBottomSheet`（Apache-2.0）：研究连续 Sheet 进度、Anchor 和 Nested Scroll；未复制源码。
+- `kizitonwose/Calendar`（MIT）：研究月份状态、单选、区间和日期边界；未引入依赖。
+- `patrykandpatrick/vico`（Apache-2.0）：研究 Marker、图表滚动与缩放；未引入依赖。
+- `Calvin-LL/Reorderable`（Apache-2.0）：研究拖柄、自动让位与无障碍排序；未引入依赖。
+- `fornewid/material-motion-compose`（Apache-2.0）：研究 Shared Axis 与 Fade Through；只用 Compose API 自行实现产品过渡。
+- `zed-alpha/shadow-gadgets`（Apache-2.0）：研究 Compose 阴影边界和裁剪；未引入依赖。
 - `enrique-lozano/Monekin`（AGPL-3.0）：研究本地优先、分类、预算、备份和财务信息层级。
 - `jameskokoska/Cashew`（GPL-3.0）：研究首页趋势、分类数据结构和移动端预算信息组织。
 - `Ivy-Apps/ivy-wallet`（GPL-3.0）：研究 Compose 记账产品的简洁信息架构与自定义体验。

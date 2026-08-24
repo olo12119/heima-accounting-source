@@ -2,10 +2,7 @@ package com.heima.accounting.ui
 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -58,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.foundation.pager.PagerState
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.HeimaMotionTokens
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
@@ -141,6 +140,7 @@ fun HeimaBottomBar(
         cornerRadius = 30.dp,
         elevation = 18.dp,
         backdropBlur = true,
+        role = HeimaSurfaceRole.OVERLAY,
     ) {
         BoxWithConstraints(Modifier.matchParentSize()) {
             val slotWidth = maxWidth / AppDestination.entries.size
@@ -201,7 +201,7 @@ fun HeimaBottomBar(
                         } else {
                             pagerState.animateScrollToPage(
                                 page = targetPage,
-                                animationSpec = spring(dampingRatio = .90f, stiffness = 520f),
+                                animationSpec = HeimaMotionTokens.snap(reduceMotion = false),
                             )
                         }
                         if (!cancelled && targetPage != startingPage) onBoundaryFeedback()
@@ -349,7 +349,7 @@ private fun BottomBarItem(
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
     val primary = destination == AppDestination.RECORD
-    val feedbackSpec = if (motion.reduceMotion || primary) tween<Color>(90) else spring(dampingRatio = 0.9f, stiffness = 500f)
+    val feedbackSpec = HeimaMotionTokens.responsive<Color>(motion.reduceMotion)
     val color by animateColorAsState(
         if (selected || primary) palette.brand else palette.textTertiary,
         feedbackSpec,
@@ -357,14 +357,14 @@ private fun BottomBarItem(
     )
     val selection by animateFloatAsState(
         if (selected) 1f else 0f,
-        if (motion.reduceMotion || primary) tween(90) else spring(dampingRatio = 0.88f, stiffness = 500f),
+        HeimaMotionTokens.snap(motion.reduceMotion),
         label = "navigation_selection",
     )
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (pressed && !motion.reduceMotion) .94f else 1f,
-        animationSpec = if (motion.reduceMotion) tween(50) else spring(dampingRatio = .82f, stiffness = 700f),
+        animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
         label = "primary_navigation_press",
     )
     Column(

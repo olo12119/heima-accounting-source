@@ -2,7 +2,7 @@
 
 黑马记账现在包含两条彼此独立的产品线：
 
-- Android 正式版 `1.0.3`：本项目当前重点，已完成本地收支、完整分类编辑、连续月趋势、预算、自定义日期统计、备份恢复、独立深浅主题、直接拖动导航和 Liquid Glass。
+- Android 正式版 `1.1.0`：本项目当前重点，已完成本地收支、完整分类编辑、预算与统计，以及统一 Liquid Glass Material / Motion 设计系统和手动在线更新检查。
 - Windows 桌面版 `1.5.0`：保留在 `apps/windows-desktop`，没有被 Android 工程覆盖。
 
 iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项目当前只发布 Android App，不制作 iOS 版本。
@@ -11,7 +11,7 @@ iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项�
 
 ## 快速导航
 
-- 当前正式版本：[Android 1.0.3](CHANGELOG.md)
+- 当前正式版本：[Android 1.1.0](CHANGELOG.md)
 - [Android 产品、设计和构建文档](docs/android/README.md)
 - [正式报告索引](docs/reports/README.md)
 - [Git 存档教学](docs/GIT_GUIDE.md)
@@ -22,10 +22,10 @@ iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项�
 把这个文件复制到安卓手机并点击安装：
 
 ```text
-手机安装包\黑马记账-Android-正式版-1.0.3.apk
+手机安装包\黑马记账-Android-正式版-1.1.0.apk
 ```
 
-这是已经签名的正式安装文件，代表当前最终源码。`手机安装包\旧版本-请勿安装` 中的 0.1、0.2 和 1.0.0 仅用于历史对比。
+这是已经签名的正式安装文件，代表当前最终源码。1.0.3 及更早 APK 都是历史版本，不再用于验收。
 
 如果想在电脑模拟器查看当前源码，双击：
 
@@ -50,7 +50,7 @@ iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项�
 
 ## 技术结构
 
-Android 使用 Kotlin + Jetpack Compose + SQLite。账目金额以整数“分”保存；数据库、导出与恢复在数据层完成，页面不能直接绕过校验修改数据库。Liquid Glass 使用 Kyant Backdrop，并对旧系统、省电模式和用户关闭效果提供一致回退。
+Android 使用 Kotlin + Jetpack Compose + SQLite。账目金额以整数“分”保存；数据库、导出与恢复在数据层完成，页面不能直接绕过校验修改数据库。Liquid Glass 使用 Kyant Backdrop，并对旧系统、省电模式和用户关闭效果提供一致回退。1.1.0 的完整 55 项核验见 [UI / Motion / Material 专项报告](UI_MOTION_MATERIAL_REPORT.md)。
 
 ## Git“游戏存档”
 

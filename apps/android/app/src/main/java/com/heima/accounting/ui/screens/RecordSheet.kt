@@ -7,7 +7,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -46,7 +45,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +72,8 @@ import com.heima.accounting.designsystem.GlassFieldSurface
 import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.HeimaMotionTokens
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
@@ -96,6 +99,7 @@ fun RecordSheet(
     onSave: (Transaction) -> Unit,
     onAddCategory: (EntryType) -> Unit,
     onSelectionFeedback: () -> Unit = {},
+    onVisibilityProgress: (Float) -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -128,14 +132,20 @@ fun RecordSheet(
     val primaryCategories = snapshot.topLevelCategories(type)
     val selectedPrimary = snapshot.category(primaryId)
     val secondaryCategories = primaryId?.let(snapshot::childCategories).orEmpty()
+    val visibilityProgress = (
+        scrimAlpha.value * (1f - dragOffset / dismissDistance)
+        ).coerceIn(0f, 1f)
+
+    SideEffect { onVisibilityProgress(visibilityProgress) }
+    DisposableEffect(Unit) { onDispose { onVisibilityProgress(0f) } }
 
     LaunchedEffect(Unit) {
         if (motion.reduceMotion) {
             entranceOffset.snapTo(0f)
             scrimAlpha.snapTo(targetScrimAlpha)
         } else {
-            launch { scrimAlpha.animateTo(targetScrimAlpha, tween(100)) }
-            entranceOffset.animateTo(0f, tween(130, easing = FastOutSlowInEasing))
+            launch { scrimAlpha.animateTo(targetScrimAlpha, tween(HeimaMotionTokens.Fast)) }
+            entranceOffset.animateTo(0f, tween(HeimaMotionTokens.Fast, easing = FastOutSlowInEasing))
         }
     }
 
@@ -146,8 +156,8 @@ fun RecordSheet(
             if (motion.reduceMotion) {
                 onDismiss()
             } else {
-                val scrimJob = launch { scrimAlpha.animateTo(0f, tween(90)) }
-                animate(dragOffset, dismissDistance, animationSpec = tween(120, easing = FastOutSlowInEasing)) { value, _ ->
+                val scrimJob = launch { scrimAlpha.animateTo(0f, tween(HeimaMotionTokens.Instant)) }
+                animate(dragOffset, dismissDistance, animationSpec = tween(HeimaMotionTokens.Fast, easing = FastOutSlowInEasing)) { value, _ ->
                     dragOffset = value
                 }
                 scrimJob.join()
@@ -192,10 +202,12 @@ fun RecordSheet(
             // One opaque-enough modal material is cheaper and cleaner than nested
             // live blur layers, especially while the sheet follows the user's finger.
             backdropBlur = false,
+            role = HeimaSurfaceRole.OVERLAY,
         ) {
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = .76f + visibilityProgress * .24f }
                     .background(palette.surface.copy(alpha = if (motion.darkTheme) .96f else .94f))
                     .verticalScroll(rememberScrollState())
                     .padding(start = 18.dp, end = 18.dp, top = 9.dp, bottom = 18.dp),
@@ -218,7 +230,7 @@ fun RecordSheet(
                                         animate(
                                             dragOffset,
                                             0f,
-                                            animationSpec = if (motion.reduceMotion) tween(70) else spring(dampingRatio = .84f, stiffness = 520f),
+                                            animationSpec = HeimaMotionTokens.soft(motion.reduceMotion),
                                         ) { value, _ -> dragOffset = value }
                                     }
                                 }
@@ -287,8 +299,8 @@ fun RecordSheet(
 
                 AnimatedVisibility(
                     visible = secondaryExpanded && selectedPrimary != null && secondaryCategories.isNotEmpty(),
-                    enter = if (motion.reduceMotion) fadeIn(tween(80)) else expandVertically(tween(180)) + fadeIn(tween(130)),
-                    exit = if (motion.reduceMotion) fadeOut(tween(70)) else shrinkVertically(tween(140)) + fadeOut(tween(90)),
+                    enter = if (motion.reduceMotion) fadeIn(tween(HeimaMotionTokens.Instant)) else expandVertically(tween(HeimaMotionTokens.Standard)) + fadeIn(tween(HeimaMotionTokens.Fast)),
+                    exit = if (motion.reduceMotion) fadeOut(tween(HeimaMotionTokens.Instant)) else shrinkVertically(tween(HeimaMotionTokens.Fast)) + fadeOut(tween(HeimaMotionTokens.Instant)),
                 ) {
                     Column(
                         Modifier
@@ -446,7 +458,7 @@ private fun KeyButton(text: String, onClick: () -> Unit, modifier: Modifier = Mo
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed && !motion.reduceMotion) .975f else 1f,
-        animationSpec = if (motion.reduceMotion) tween(60) else spring(dampingRatio = .90f, stiffness = 700f),
+        animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
         label = "number_key_press",
     )
     val shape = RoundedCornerShape(16.dp)
@@ -474,7 +486,7 @@ private fun KeyButton(text: String, onClick: () -> Unit, modifier: Modifier = Mo
 @Composable
 private fun SaveButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val palette = HeimaTheme.palette
-    PressableGlassSurface(onClick, modifier.height(220.dp), 21.dp, backdropBlur = false) {
+    PressableGlassSurface(onClick, modifier.height(220.dp), 21.dp, backdropBlur = false, role = HeimaSurfaceRole.INTERACTIVE) {
         Box(
             Modifier.matchParentSize().background(Brush.verticalGradient(listOf(palette.accent, palette.brand)), RoundedCornerShape(21.dp)),
             contentAlignment = Alignment.Center,

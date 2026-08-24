@@ -16,8 +16,8 @@ android {
         applicationId = "com.heima.accounting"
         minSdk = 29
         targetSdk = 37
-        versionCode = 103
-        versionName = "1.0.3"
+        versionCode = 110
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

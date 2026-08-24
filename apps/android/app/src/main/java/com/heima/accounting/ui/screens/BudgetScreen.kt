@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.LedgerSnapshot
@@ -54,7 +55,7 @@ fun BudgetScreen(snapshot: LedgerSnapshot, amountsVisible: Boolean, onSaveBudget
     ) {
         item { ScreenHeading("预算", "给生活留一点从容") }
         item {
-            GlassSurface(Modifier.fillMaxWidth(), 30.dp, backdropBlur = true) {
+            GlassSurface(Modifier.fillMaxWidth(), 30.dp, backdropBlur = true, role = HeimaSurfaceRole.HERO) {
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(164.dp), contentAlignment = Alignment.Center) {
                         AnimatedBudgetGauge(ratio, Modifier.matchParentSize())
@@ -73,7 +74,7 @@ fun BudgetScreen(snapshot: LedgerSnapshot, amountsVisible: Boolean, onSaveBudget
                         color = if (remaining != null && remaining < 0) palette.expense else palette.textSecondary,
                     )
                     Spacer(Modifier.height(16.dp))
-                    PressableGlassSurface({ editing = true }, Modifier.fillMaxWidth().height(50.dp), 18.dp, backdropBlur = false) {
+                    PressableGlassSurface({ editing = true }, Modifier.fillMaxWidth().height(50.dp), 18.dp, backdropBlur = false, role = HeimaSurfaceRole.INTERACTIVE) {
                         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { Text(if (budget == null) "设置本月预算" else "修改本月预算", color = palette.brand, fontWeight = FontWeight.SemiBold) }
                     }
                 }
@@ -81,7 +82,7 @@ fun BudgetScreen(snapshot: LedgerSnapshot, amountsVisible: Boolean, onSaveBudget
         }
         item { SectionHeading("本月概览") }
         item {
-            GlassSurface(Modifier.fillMaxWidth(), 24.dp, backdropBlur = false) {
+            GlassSurface(Modifier.fillMaxWidth(), 24.dp, backdropBlur = false, role = HeimaSurfaceRole.INSIGHT) {
                 Row(Modifier.padding(20.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     BudgetMetric("已支出", summary.expenseCents, amountsVisible)
                     BudgetMetric(if (remaining != null && remaining < 0) "已超出" else "还可使用", kotlin.math.abs(remaining ?: 0L), amountsVisible)
@@ -90,7 +91,7 @@ fun BudgetScreen(snapshot: LedgerSnapshot, amountsVisible: Boolean, onSaveBudget
         }
         item { SectionHeading("温和提醒") }
         item {
-            GlassSurface(Modifier.fillMaxWidth(), 22.dp, backdropBlur = false) {
+            GlassSurface(Modifier.fillMaxWidth(), 22.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                 Text(
                     when {
                         budget == null -> "设置预算后，这里会用真实支出计算使用比例。"

@@ -10,6 +10,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -101,7 +104,30 @@ fun AnimatedTrendChart(
         if (!reduceMotion) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
         else progress.snapTo(1f)
     }
-    Canvas(modifier.semantics { contentDescription = "消费趋势图，共${totals.size}天数据" }) {
+    var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
+    Box(modifier.semantics { contentDescription = "消费趋势图，共${totals.size}天数据" }) {
+    Canvas(
+        Modifier
+            .matchParentSize()
+            .pointerInput(totals) {
+                detectTapGestures { tap ->
+                    if (totals.isNotEmpty()) {
+                        selectedIndex = ((tap.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    }
+                }
+            }
+            .pointerInput(totals) {
+                detectDragGestures(
+                    onDragStart = { start ->
+                        if (totals.isNotEmpty()) selectedIndex = ((start.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        if (totals.isNotEmpty()) selectedIndex = ((change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    },
+                )
+            },
+    ) {
         val baselineY = size.height - 4.dp.toPx()
         drawLine(
             palette.divider,
@@ -158,6 +184,26 @@ fun AnimatedTrendChart(
             drawCircle(lineColor.copy(alpha = .14f), radius = 7.dp.toPx(), center = latest)
             drawCircle(lineColor, radius = 3.dp.toPx(), center = latest)
         }
+        points.getOrNull(selectedIndex)?.let { selected ->
+            drawLine(
+                color = palette.outline.copy(alpha = .72f),
+                start = Offset(selected.x, 0f),
+                end = Offset(selected.x, baselineY),
+                strokeWidth = 1.dp.toPx(),
+            )
+            drawCircle(lineColor.copy(alpha = .18f), radius = 9.dp.toPx(), center = selected)
+            drawCircle(lineColor, radius = 4.dp.toPx(), center = selected)
+        }
+    }
+    totals.getOrNull(selectedIndex)?.let { selected ->
+        val value = if (showIncome) selected.incomeCents else selected.expenseCents
+        Text(
+            text = "${selected.date.format(DateTimeFormatter.ofPattern("M月d日"))}  ${value.formatYuan()}",
+            color = palette.textPrimary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
+    }
     }
 }
 

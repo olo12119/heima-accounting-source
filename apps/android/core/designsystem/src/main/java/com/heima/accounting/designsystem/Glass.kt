@@ -1,14 +1,13 @@
 package com.heima.accounting.designsystem
 
 import android.os.Build
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -17,7 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +52,7 @@ fun GlassSurface(
     cornerRadius: Dp = 28.dp,
     elevation: Dp = 14.dp,
     backdropBlur: Boolean = false,
+    role: HeimaSurfaceRole = HeimaSurfaceRole.METRIC,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val palette = HeimaTheme.palette
@@ -57,31 +60,28 @@ fun GlassSurface(
     val material = HeimaTheme.motion
     val backdrop = LocalHeimaBackdrop.current
     val shape = RoundedCornerShape(cornerRadius)
-    val blurEnabled = backdropBlur && backdrop != null && material.expensiveGlassEnabled && Build.VERSION.SDK_INT >= 33
-    val surfaceAlpha = when (quality) {
-        VisualQuality.REFINED -> if (blurEnabled) 0.24f else 0.78f
-        VisualQuality.AUTO -> if (blurEnabled) 0.32f else 0.84f
-        VisualQuality.POWER_SAVER -> 0.94f
-    }
+    val spec = HeimaMaterialSystem.spec(role, backdropBlur)
+    val blurEnabled = spec.backdropBlur && backdrop != null && material.expensiveGlassEnabled && Build.VERSION.SDK_INT >= 33
+    val surfaceAlpha = spec.surfaceAlpha
 
     val opticalModifier = when {
-        !material.liquidGlassEnabled -> Modifier.background(palette.surfaceElevated)
+        !material.liquidGlassEnabled -> Modifier.background(palette.solidSurface(role))
         blurEnabled -> {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
             effects = {
                 vibrancy()
-                blur(if (quality == VisualQuality.REFINED) 12.dp.toPx() else 8.dp.toPx())
+                blur(spec.blurRadius.toPx())
                 lens(
-                    refractionHeight = if (quality == VisualQuality.REFINED) 4.dp.toPx() else 2.dp.toPx(),
-                    refractionAmount = if (quality == VisualQuality.REFINED) 5.dp.toPx() else 3.dp.toPx(),
+                    refractionHeight = spec.refractionHeight.toPx(),
+                    refractionAmount = spec.refractionAmount.toPx(),
                     chromaticAberration = false,
                 )
             },
-            highlight = { Highlight.Default.copy(alpha = if (material.darkTheme) .07f else .34f) },
+            highlight = { Highlight.Default.copy(alpha = spec.highlightAlpha) },
             shadow = { Shadow(alpha = if (material.darkTheme) .12f else .28f) },
-            innerShadow = { InnerShadow(radius = 5.dp, alpha = if (material.darkTheme) .06f else .20f) },
+            innerShadow = { InnerShadow(radius = 5.dp, alpha = spec.innerShadowAlpha) },
             onDrawSurface = {
                 drawRect(
                     brush = Brush.linearGradient(
@@ -118,7 +118,7 @@ fun GlassSurface(
     Box(
         modifier = modifier
             .shadow(
-                elevation = elevation,
+                elevation = if (elevation == 14.dp) spec.shadowLevel.elevation() else elevation,
                 shape = shape,
                 ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .30f else .16f),
                 spotColor = palette.glassShadow,
@@ -192,17 +192,22 @@ fun PressableGlassSurface(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 28.dp,
     backdropBlur: Boolean = false,
+    role: HeimaSurfaceRole = HeimaSurfaceRole.INTERACTIVE,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val motion = HeimaTheme.motion
+    val palette = HeimaTheme.palette
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    var pressPosition by remember { mutableStateOf(Offset.Unspecified) }
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Press) pressPosition = interaction.pressPosition
+        }
+    }
     val progress by animateFloatAsState(
         targetValue = if (isPressed && !motion.reduceMotion) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
         label = "glass_press_progress",
     )
 
@@ -214,6 +219,25 @@ fun PressableGlassSurface(
                 scaleY = scale
                 translationY = progress * 1.5.dp.toPx()
             }
+            .drawWithCache {
+                val center = if (pressPosition != Offset.Unspecified) {
+                    pressPosition
+                } else {
+                    Offset(size.width / 2f, size.height / 2f)
+                }
+                val highlight = Brush.radialGradient(
+                    colors = listOf(
+                        palette.glassHighlight.copy(alpha = progress * if (motion.darkTheme) .10f else .28f),
+                        Color.Transparent,
+                    ),
+                    center = center,
+                    radius = size.maxDimension * .72f,
+                )
+                onDrawWithContent {
+                    drawContent()
+                    if (progress > 0f) drawRect(highlight)
+                }
+            }
             .then(
                 Modifier.noRippleClick(
                     interactionSource = interactionSource,
@@ -223,6 +247,7 @@ fun PressableGlassSurface(
         cornerRadius = cornerRadius,
         elevation = if (backdropBlur) 14.dp else 5.dp,
         backdropBlur = backdropBlur,
+        role = role,
         content = content,
     )
 }

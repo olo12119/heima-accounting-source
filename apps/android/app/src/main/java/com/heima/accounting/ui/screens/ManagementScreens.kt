@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +47,7 @@ import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.GlassToggle
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
@@ -134,6 +136,7 @@ fun CategoriesScreen(
     onSave: (Category) -> Unit,
     onDelete: (Category) -> Unit,
     onReorder: (List<String>) -> Unit,
+    onSelectionFeedback: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     var typeFilter by remember { mutableStateOf<EntryType?>(null) }
@@ -222,6 +225,7 @@ fun CategoriesScreen(
                         }
                     },
                     onLongPress = { sortingGroup = sectionType },
+                    onDragFeedback = onSelectionFeedback,
                 )
             }
         }
@@ -262,11 +266,28 @@ private fun CategoryManagementCard(
     onDelete: (Category) -> Unit,
     onMove: (Int) -> Unit,
     onLongPress: () -> Unit,
+    onDragFeedback: () -> Unit,
 ) {
     val palette = HeimaTheme.palette
     val reorderThreshold = with(LocalDensity.current) { 42.dp.toPx() }
     var draggedDistance by remember(category.id) { mutableFloatStateOf(0f) }
-    GlassSurface(Modifier.fillMaxWidth(), 23.dp, backdropBlur = false) {
+    var dragging by remember(category.id) { mutableStateOf(false) }
+    GlassSurface(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationY = draggedDistance.coerceIn(-reorderThreshold, reorderThreshold) * .28f
+                val lift = if (dragging) 1.018f else 1f
+                scaleX = lift
+                scaleY = lift
+                shadowElevation = if (dragging) 14.dp.toPx() else 0f
+                shape = RoundedCornerShape(23.dp)
+                clip = false
+            },
+        23.dp,
+        backdropBlur = false,
+        role = HeimaSurfaceRole.LIST,
+    ) {
         Column(Modifier.padding(17.dp)) {
             Row(
                 Modifier
@@ -275,20 +296,24 @@ private fun CategoryManagementCard(
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
                                 draggedDistance = 0f
+                                dragging = true
                                 onLongPress()
+                                onDragFeedback()
                             },
-                            onDragCancel = { draggedDistance = 0f },
-                            onDragEnd = { draggedDistance = 0f },
+                            onDragCancel = { draggedDistance = 0f; dragging = false },
+                            onDragEnd = { draggedDistance = 0f; dragging = false },
                             onDrag = { change, amount ->
                                 change.consume()
                                 draggedDistance += amount.y
                                 when {
                                     draggedDistance >= reorderThreshold -> {
                                         onMove(1)
+                                        onDragFeedback()
                                         draggedDistance = 0f
                                     }
                                     draggedDistance <= -reorderThreshold -> {
                                         onMove(-1)
+                                        onDragFeedback()
                                         draggedDistance = 0f
                                     }
                                 }

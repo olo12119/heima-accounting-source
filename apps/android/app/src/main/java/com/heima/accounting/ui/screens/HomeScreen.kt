@@ -32,7 +32,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.HeimaType
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.FinancialInsightLevel
@@ -116,17 +118,25 @@ fun HomeScreen(
         }
 
         item {
-            Column {
-                Text("今日消费", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
-                Spacer(Modifier.height(4.dp))
-                SensitiveAmountText(todaySummary.expenseCents, amountsVisible, MaterialTheme.typography.displayLarge, palette.textPrimary)
-                SensitiveAmountText(todaySummary.incomeCents, amountsVisible, MaterialTheme.typography.bodyLarge, palette.textSecondary, prefix = "今日收入  ")
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 31.dp,
+                backdropBlur = true,
+                role = HeimaSurfaceRole.HERO,
+            ) {
+                Column(Modifier.padding(horizontal = 22.dp, vertical = 21.dp)) {
+                    Text("今日消费", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
+                    Spacer(Modifier.height(4.dp))
+                    SensitiveAmountText(todaySummary.expenseCents, amountsVisible, HeimaType.displayAmount, palette.textPrimary)
+                    Spacer(Modifier.height(2.dp))
+                    SensitiveAmountText(todaySummary.incomeCents, amountsVisible, MaterialTheme.typography.bodyLarge, palette.textSecondary, prefix = "今日收入  ")
+                }
             }
         }
 
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = false) {
+                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = false, role = HeimaSurfaceRole.METRIC) {
                     Column(Modifier.padding(17.dp)) {
                         Text("本月趋势", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(10.dp))
@@ -143,6 +153,7 @@ fun HomeScreen(
                         .semantics { contentDescription = "查看本月预算" },
                     cornerRadius = 26.dp,
                     backdropBlur = true,
+                    role = HeimaSurfaceRole.METRIC,
                 ) {
                     Box(Modifier.matchParentSize().padding(17.dp)) {
                         Column {
@@ -163,7 +174,7 @@ fun HomeScreen(
         }
 
         item {
-            GlassSurface(Modifier.fillMaxWidth().height(145.dp), cornerRadius = 28.dp, backdropBlur = true) {
+            GlassSurface(Modifier.fillMaxWidth().height(145.dp), cornerRadius = 28.dp, backdropBlur = true, role = HeimaSurfaceRole.INSIGHT) {
                 Row(Modifier.matchParentSize().padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("财务状态", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
@@ -187,7 +198,7 @@ fun HomeScreen(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(monthSummary.categoryTotals.take(6), key = { it.categoryId }) { total ->
                         val category = snapshot.category(total.categoryId)
-                        GlassSurface(Modifier.size(width = 132.dp, height = 142.dp), cornerRadius = 24.dp, backdropBlur = false) {
+                        GlassSurface(Modifier.size(width = 132.dp, height = 142.dp), cornerRadius = 24.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                             Column(Modifier.padding(15.dp)) {
                                 CategoryIcon(category?.iconKey ?: "other", selected = false, size = 54.dp)
                                 Spacer(Modifier.height(3.dp))
@@ -204,7 +215,7 @@ fun HomeScreen(
         item { SectionHeading("最近账单", action = "查看全部", onAction = onOpenRecords) }
         if (recent.isEmpty()) {
             item {
-                PressableGlassSurface(onRecord, Modifier.fillMaxWidth(), cornerRadius = 24.dp, backdropBlur = true) {
+                PressableGlassSurface(onRecord, Modifier.fillMaxWidth(), cornerRadius = 24.dp, backdropBlur = true, role = HeimaSurfaceRole.INTERACTIVE) {
                     Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
                         Text("还没有账单", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(5.dp))
@@ -214,7 +225,7 @@ fun HomeScreen(
             }
         } else {
             item {
-                GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 25.dp, backdropBlur = false) {
+                GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 25.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
                         recent.forEach { transaction -> TransactionRow(transaction, snapshot, amountsVisible, { onTransactionClick(transaction.id) }) }
                     }

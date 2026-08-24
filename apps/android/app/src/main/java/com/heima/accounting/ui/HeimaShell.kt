@@ -5,13 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
@@ -33,6 +26,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,10 +41,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.HeimaViewModel
+import com.heima.accounting.BuildConfig
 import com.heima.accounting.UiEvent
 import com.heima.accounting.data.LedgerState
 import com.heima.accounting.designsystem.AmbientBackdrop
 import com.heima.accounting.designsystem.HeimaColorMode
+import com.heima.accounting.designsystem.HeimaMotionTokens
+import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaThemeStyle
 import com.heima.accounting.designsystem.GlassSurface
@@ -66,6 +63,7 @@ import com.heima.accounting.ui.screens.ProfileScreen
 import com.heima.accounting.ui.screens.RecordSheet
 import com.heima.accounting.ui.screens.RecordsScreen
 import com.heima.accounting.ui.screens.StatisticsScreen
+import com.heima.accounting.update.AppUpdateChecker
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import java.time.LocalDate
@@ -124,6 +122,7 @@ fun HeimaShell(
     }
     val pageStateHolder = rememberSaveableStateHolder()
     var recordPanelVisible by rememberSaveable { mutableStateOf(false) }
+    var recordVisibilityProgress by remember { mutableFloatStateOf(0f) }
     var editing by remember { mutableStateOf<Transaction?>(null) }
     var restoreCandidate by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf<String?>(null) }
@@ -136,11 +135,7 @@ fun HeimaShell(
     } else {
         Modifier
     }
-    val contentAlpha by animateFloatAsState(
-        targetValue = if (recordPanelVisible) .58f else 1f,
-        animationSpec = tween(if (motion.reduceMotion) 60 else 120),
-        label = "modal_background_weight",
-    )
+    val contentAlpha = 1f - recordVisibilityProgress * .42f
 
     val createDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val content = pendingExport
@@ -221,24 +216,19 @@ fun HeimaShell(
                     // Do not run a full-screen RenderEffect while the sheet moves.
                     // The dim layer and reduced contrast create modal depth without
                     // forcing every background pixel through another blur pass.
-                    .graphicsLayer { alpha = contentAlpha },
+                    .graphicsLayer {
+                        alpha = contentAlpha
+                        val scale = 1f - recordVisibilityProgress * .012f
+                        scaleX = scale
+                        scaleY = scale
+                    },
             ) {
             AmbientBackdrop(Modifier.fillMaxSize().then(backdropRecorder))
             Box(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = managementPage,
                     modifier = Modifier.fillMaxSize(),
-                    transitionSpec = {
-                        if (motion.reduceMotion) {
-                            fadeIn(tween(70)) togetherWith fadeOut(tween(60))
-                        } else if (targetState != null) {
-                            (slideInHorizontally(tween(220)) { it / 4 } + fadeIn(tween(170))) togetherWith
-                                (slideOutHorizontally(tween(200)) { -it / 5 } + fadeOut(tween(140)))
-                        } else {
-                            (slideInHorizontally(tween(220)) { -it / 5 } + fadeIn(tween(170))) togetherWith
-                                (slideOutHorizontally(tween(200)) { it / 4 } + fadeOut(tween(140)))
-                        }
-                    },
+                    transitionSpec = { HeimaMotionTokens.sharedAxisX(targetState != null, motion.reduceMotion, 92) },
                     label = "secondary_navigation",
                 ) { secondaryPage ->
                 when {
@@ -264,6 +254,7 @@ fun HeimaShell(
                         },
                         viewModel::deleteCustomCategory,
                         viewModel::reorderCategories,
+                        feedback::selection,
                     ) }
                     secondaryPage == ManagementPage.DATA -> pageStateHolder.SaveableStateProvider("data") { DataScreen(
                         popSecondary,
@@ -314,6 +305,7 @@ fun HeimaShell(
                             AppDestination.PROFILE -> ProfileScreen(
                                 ledgerState.snapshot.transactions.size, themeStyle, colorMode, visualQuality, reduceMotion, powerSaveMode,
                                 liquidGlassEnabled, soundEnabled, hapticEnabled,
+                                BuildConfig.VERSION_NAME, AppUpdateChecker::check,
                                 onThemeStyleChange, onColorModeChange, onVisualQualityChange, onReduceMotionChange,
                                 onLiquidGlassEnabledChange, onSoundEnabledChange, onHapticEnabledChange,
                                 { navigateToSecondary(ManagementPage.CATEGORIES) },
@@ -356,7 +348,7 @@ fun HeimaShell(
                 snackbar,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = if (managementPage == null) 92.dp else 14.dp),
             ) { data ->
-                GlassSurface(Modifier.fillMaxWidth(), 18.dp, 8.dp, backdropBlur = false) {
+                GlassSurface(Modifier.fillMaxWidth(), 18.dp, 8.dp, backdropBlur = false, role = HeimaSurfaceRole.OVERLAY) {
                     androidx.compose.foundation.layout.Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -376,6 +368,7 @@ fun HeimaShell(
                         { transaction -> viewModel.saveTransaction(transaction); recordPanelVisible = false; editing = null },
                         { navigateToSecondary(ManagementPage.CATEGORIES); recordPanelVisible = false },
                         feedback::selection,
+                        { recordVisibilityProgress = it },
                     )
                 }
             }
