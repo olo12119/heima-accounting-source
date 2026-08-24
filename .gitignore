@@ -22,3 +22,7 @@ Thumbs.db
 .env*
 !.env.example
 /手机安装包/*.apk
+
+# Android Studio 本机配置（不属于项目源码）
+apps/android/.idea/
+apps/android/gradle/gradle-daemon-jvm.properties
