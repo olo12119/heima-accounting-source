@@ -1474,3 +1474,33 @@ testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 - 大小：4,878,194 字节；SHA-256：`f6c2a2460f7f653964f6a24e788ae55494eda63f6cb40353d53104a0c341fa25`。
 - 报告：`docs/reports/FINAL_RELEASE_REPORT.md`、`docs/reports/TEST_REPORT.md`、`docs/reports/PERFORMANCE_REPORT.md`、`docs/reports/UX_REGRESSION_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
 - 真机扬声器、触觉手感、耗电、温升、Thermal 和 90/120Hz 仍为 `NEEDS REAL DEVICE VERIFICATION`，模拟器结果不能替代真机。
+
+## 2026-08-24：私有源码仓库规范化整理
+
+### 需求背景
+
+用户创建了 GitHub 私有源码仓库，并要求仓库像优质项目一样清晰、整洁，同时保留对非技术用户友好的本地启动入口。在线更新和公开 APK 发布明确延后讨论，本轮不改变 App 功能和安装包。
+
+### 实现范围
+
+1. 保留根目录的双击启动与 Git 查看入口，避免为了目录形式而降低用户使用便利性。
+2. 新增根目录 `CHANGELOG.md`，集中记录正式 Android 版本的主要变化。
+3. 将最终发布、测试、性能、UX 回归四份正式报告归档到 `docs/reports/`，并新增该目录的报告索引。
+4. 更新 README、架构、Android 文档和本开发日志中的报告路径，避免整理后链接失效。
+5. 为实际 Android 1.0.3 发布提交创建 `android-v1.0.3` 注释标签；源码主路线使用标准 `main` 并同步到 GitHub 私有仓库。
+
+### 数据兼容
+
+- 仅调整项目文档、Git 标签和目录位置，不修改 Android App 代码、SQLite 表结构、用户账单、APK 或签名文件。
+- Android Studio 自动生成配置继续由 `.gitignore` 排除；本机 `apps/android/gradle.properties` 的同步优化保留在本机，未存档、未上传。
+
+### 验证结果
+
+- `git diff --check`：通过，没有文档格式错误。
+- 整理后的报告路径已全文检索并更新；报告内部相对链接保持有效。
+- GitHub `main` 已核对为本次整理存档；`android-v1.0.3` 标签已同步到远程。
+
+### 交付与限制
+
+- 本轮只同步私有源码和文档，不上传 APK，也未实现 App 在线更新。
+- GitHub 仓库仍保持私有；签名密钥、账单数据库、Android Studio 本机配置和发布 APK 均不在仓库中。
