@@ -16,6 +16,7 @@ iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项�
 - [正式报告索引](docs/reports/README.md)
 - [Git 存档教学](docs/GIT_GUIDE.md)
 - [第三方开源说明](THIRD_PARTY_NOTICES.md)
+- [Android 公开更新与下载页](https://github.com/olo12119/heima-accounting-releases/releases/latest)
 
 ## 普通用户唯一推荐入口
 

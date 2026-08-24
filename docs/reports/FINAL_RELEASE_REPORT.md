@@ -39,7 +39,7 @@
 - “我的”新增“检查更新”，当前版本显示为 1.1.0。
 - 只在用户主动点击时读取 GitHub Releases 最新版本；发现新版后打开系统浏览器下载。
 - 不后台轮询、不静默安装、不上传账单、不读取登录信息。
-- 公开发布仓库必须真正发布 1.1.0 Release 后，此功能才会返回可下载版本。
+- 公开发布仓库和 `v1.1.0` Release 已上线；无登录检查返回 `draft=false`、`prerelease=false`，APK 下载返回 HTTP 200。
 
 ## 架构
 
@@ -58,7 +58,7 @@ app（Compose 页面、Pager、Sheet、更新检查与一次性事件）
 - ✅ Release Lint、R8、资源收缩和 Release 构建通过。
 - ✅ APK v3 验签、版本识别和覆盖安装通过。
 - ✅ 最终正式包冷启动：971ms；启动日志无 App FATAL/ANR。
-- ✅ 55 项专项清单：52 项 `✅`、3 项 `⚠️`、0 项 `❌`。
+- ✅ 55 项专项清单：53 项 `✅`、2 项 `⚠️`、0 项 `❌`。
 - ⚠️ 真实音色、触觉手感、耗电、温升、厂商 GPU 与 90/120Hz 为 `NEEDS REAL DEVICE VERIFICATION`。
 
 详细证据见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和根目录 `UI_MOTION_MATERIAL_REPORT.md`。

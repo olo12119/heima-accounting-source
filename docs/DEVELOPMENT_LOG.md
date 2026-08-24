@@ -1547,11 +1547,11 @@ testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 - Release Lint、R8、资源收缩和构建成功。
 - 最终 APK 为 4,894,578 字节，SHA-256 为 `D71A5FAD081CE222ABE47C1E9BD845AA81DF0A12FBB26101AFA243480E773FF0`。
 - v3 正式签名验证通过；覆盖安装识别 `versionCode=110`、`versionName=1.1.0`；冷启动 971ms，无 App FATAL/ANR。
-- 55 项自查为 52 项 ✅、3 项 ⚠️、0 项 ❌；⚠️ 均为真机硬件或公开发布状态边界。
+- 55 项自查为 53 项 ✅、2 项 ⚠️、0 项 ❌；⚠️ 均为模拟器无法替代的真机硬件边界。
 
 ### 交付与限制
 
 - 唯一推荐 APK：`手机安装包/黑马记账-Android-正式版-1.1.0.apk`。
 - 完整专项报告：根目录 `UI_MOTION_MATERIAL_REPORT.md`。
 - 模拟器不能代替真实扬声器、触觉、电池、温升、厂商 GPU 与 90/120Hz 验收。
-- App 内更新只有在公开 GitHub Releases 仓库存在并发布对应 APK 后才能形成完整闭环；私有源码仓库继续保持私有。
+- 公开仓库 `olo12119/heima-accounting-releases` 和 `v1.1.0` Release 已上线；无登录 API 返回正式最新版本，APK 下载返回 HTTP 200 和正确长度。浏览器插件不允许直接上传 Release 附件，因此 APK 整洁存放于公开仓库 `downloads` 目录，并由 Release 提供直接下载链接；App 会打开该正式下载页。
