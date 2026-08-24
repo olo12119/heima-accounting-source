@@ -1298,7 +1298,7 @@ lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-
 ### 交付与限制
 
 - 正式 APK：`手机安装包/黑马记账-Android-正式版-1.0.0.apk`。
-- 最终报告：`FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`THIRD_PARTY_NOTICES.md`。
+- 最终报告：`docs/reports/FINAL_RELEASE_REPORT.md`、`docs/reports/TEST_REPORT.md`、`docs/reports/PERFORMANCE_REPORT.md`、`THIRD_PARTY_NOTICES.md`。
 - 真机电量、温度、Thermal 和不同厂商 120Hz 表现为 `NOT TESTED`；模拟器不冒充真机。
 - 本地签名密钥和手机账目不由 Git 保护，分别需要安全复制和 App 内完整备份。
 
@@ -1361,7 +1361,7 @@ lintDebug testDebugUnitTest :app:connectedDebugAndroidTest assembleRelease --no-
 - 唯一推荐正式安装包：`手机安装包/黑马记账-Android-正式版-1.0.1.apk`。
 - 文件大小：4,747,122 字节。
 - SHA-256：`d70c691ec974f490e9fad4d491c103a1526a166daedd2be05f584225bef93e77`。
-- 最终报告同步更新为 `FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
+- 最终报告同步更新为 `docs/reports/FINAL_RELEASE_REPORT.md`、`docs/reports/TEST_REPORT.md`、`docs/reports/PERFORMANCE_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
 - 1.0.0 和更早 APK 已移入 `手机安装包/旧版本-请勿安装`；它们仅用于历史对照。
 - Git 保护源码和文档，不保护用户手机中的账单、正式签名密钥或未纳入 Git 的 APK；账单需使用 App 内备份，密钥需另行安全复制。
 
@@ -1418,7 +1418,7 @@ testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
 - 唯一推荐 APK：`手机安装包/黑马记账-Android-正式版-1.0.2.apk`。
 - 大小：4,829,042 字节；SHA-256：`1270f828c5dc43747e5e1587ca566c657a661ed9c211591691fc7ded69672e01`。
-- 新增 `UX_REGRESSION_REPORT.md`，并更新最终、测试、性能、许可、运行和安装文档。
+- 新增 `docs/reports/UX_REGRESSION_REPORT.md`，并更新最终、测试、性能、许可、运行和安装文档。
 - 真机扬声器、触觉、电池、温升、Thermal 和 90/120Hz 为 `NEEDS REAL DEVICE VERIFICATION`。
 
 ## 2026-08-23：Android 1.0.3 最终产品级定型
@@ -1472,5 +1472,5 @@ testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
 - 唯一推荐 APK：`手机安装包/黑马记账-Android-正式版-1.0.3.apk`。
 - 大小：4,878,194 字节；SHA-256：`f6c2a2460f7f653964f6a24e788ae55494eda63f6cb40353d53104a0c341fa25`。
-- 报告：`FINAL_RELEASE_REPORT.md`、`TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
+- 报告：`docs/reports/FINAL_RELEASE_REPORT.md`、`docs/reports/TEST_REPORT.md`、`docs/reports/PERFORMANCE_REPORT.md`、`docs/reports/UX_REGRESSION_REPORT.md` 与 `THIRD_PARTY_NOTICES.md`。
 - 真机扬声器、触觉手感、耗电、温升、Thermal 和 90/120Hz 仍为 `NEEDS REAL DEVICE VERIFICATION`，模拟器结果不能替代真机。

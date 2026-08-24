@@ -58,4 +58,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\measure-navig
 - Lint：`app/build/reports/lint-results-release.html`
 - 单元测试：各模块 `build/reports/tests/testDebugUnitTest/index.html`
 - 模拟器测试：`app/build/reports/androidTests/connected/debug/index.html`
-- 正式总报告：根目录 `FINAL_RELEASE_REPORT.md`
+- 正式总报告：`docs/reports/FINAL_RELEASE_REPORT.md`

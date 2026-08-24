@@ -60,4 +60,4 @@ app
 - Liquid Glass 关闭后只改变材质成本，不改变页面结构与功能。
 - 无后台服务、网络轮询、常驻 Timer 或无限动画。
 
-详细验证见根目录 `TEST_REPORT.md` 和 `PERFORMANCE_REPORT.md`。
+详细验证见 `docs/reports/TEST_REPORT.md` 和 `docs/reports/PERFORMANCE_REPORT.md`。

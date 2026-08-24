@@ -64,4 +64,4 @@ app（Compose 页面、Pager、模态导航、一次性事件与交互反馈）
 - ⚠️ Liquid Glass ON 的模拟器底栏拖动高压测试 Jank 为 11.97%，OFF 为 6.94%；这是真实差异，不伪装成理想结果。
 - ⚠️ 真机扬声器、触觉手感、耗电、温升和 90/120Hz 表现仍为 `NEEDS REAL DEVICE VERIFICATION`。
 
-详细结果见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和 `THIRD_PARTY_NOTICES.md`。
+详细结果见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和根目录 `THIRD_PARTY_NOTICES.md`。

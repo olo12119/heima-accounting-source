@@ -8,9 +8,9 @@ Android 原生正式版 `1.0.3` 已完成。iCost、Apple 原生应用、visionO
 
 ## 阅读顺序
 
-1. [最终发布报告](../../FINAL_RELEASE_REPORT.md)
-2. [测试报告](../../TEST_REPORT.md)
-3. [性能报告](../../PERFORMANCE_REPORT.md)
+1. [最终发布报告](../reports/FINAL_RELEASE_REPORT.md)
+2. [测试报告](../reports/TEST_REPORT.md)
+3. [性能报告](../reports/PERFORMANCE_REPORT.md)
 4. [产品定位与范围](PRODUCT.md)
 5. [页面结构与核心流程](INFORMATION_ARCHITECTURE.md)
 6. [Design System 与组件](DESIGN_SYSTEM.md)

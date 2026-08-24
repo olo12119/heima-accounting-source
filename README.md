@@ -7,6 +7,16 @@
 
 iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项目当前只发布 Android App，不制作 iOS 版本。
 
+这是一个私有源码仓库：Git 用来保存代码和文档历史，不保存用户账单、发布签名密钥或 Android Studio 的个人配置。
+
+## 快速导航
+
+- 当前正式版本：[Android 1.0.3](CHANGELOG.md)
+- [Android 产品、设计和构建文档](docs/android/README.md)
+- [正式报告索引](docs/reports/README.md)
+- [Git 存档教学](docs/GIT_GUIDE.md)
+- [第三方开源说明](THIRD_PARTY_NOTICES.md)
+
 ## 普通用户唯一推荐入口
 
 把这个文件复制到安卓手机并点击安装：
@@ -32,10 +42,9 @@ iCost、Apple 原生应用和 Liquid Glass 只作为设计思路参考；本项�
 ├─ apps/android/              Android 原生源码与测试
 ├─ apps/windows-desktop/      旧 Windows 产品线
 ├─ docs/android/              Android 产品、设计、构建文档
+├─ docs/reports/              正式发布、测试、性能与 UX 报告
 ├─ 手机安装包/                当前正式 APK 与归档旧版
-├─ FINAL_RELEASE_REPORT.md    最终功能和架构
-├─ TEST_REPORT.md             功能、异常和自动测试
-├─ PERFORMANCE_REPORT.md      模拟器性能与真机边界
+├─ CHANGELOG.md               正式版本更新记录
 └─ THIRD_PARTY_NOTICES.md     开源项目和许可证
 ```
 
