@@ -39,7 +39,7 @@
 ## 55 项结论
 
 - ✅ 53 项已通过代码、文档、模拟器或公开发布验收。
-- ⚠️ 2 项依赖真实设备，详见根目录 `UI_MOTION_MATERIAL_REPORT.md`。
+- ⚠️ 2 项依赖真实设备，详见 `UI_MOTION_MATERIAL_REPORT.md`。
 - ❌ 0 项。
 
 ## 仍需用户真机体验

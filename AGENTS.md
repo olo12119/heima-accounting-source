@@ -10,10 +10,10 @@
 
 ## 项目与产品来源
 
-- 当前工作区根目录就是总项目根目录，不得再创建 `HeimaAccounting`、`app`、`project` 等外层包装目录。Windows桌面工程位于 `apps/windows-desktop`，Android工程预留位于 `apps/android`。
+- 当前工作区根目录就是总项目根目录，不得再创建 `HeimaAccounting`、`app`、`project` 等外层包装目录。Android 工程位于 `apps/android`。
 - 项目对外名称为“黑马记账”，内部英文名称为 `HeimaAccounting`。
-- Windows产品需求以 `docs/PRODUCT.md` 为参考，Android产品和设计以 `docs/android/README.md` 所链接的文档为参考；重大技术选择记录在 `docs/TECH_DECISIONS.md`；实际工作和错误维护在 `docs/DEVELOPMENT_LOG.md`。
-- 下一阶段只开发Android，不制作iOS应用；iCost、Apple原生应用和Liquid Glass只用于设计参考。高保真原型未经用户确认前，不开始正式Android业务代码。
+- Android 产品和设计以 `docs/android/README.md` 所链接的文档为参考；重大技术选择记录在 `docs/TECH_DECISIONS.md`；实际工作和错误维护在 `docs/DEVELOPMENT_LOG.md`。
+- 下一阶段只开发 Android，不制作 iOS 应用；iCost、Apple 原生应用和 Liquid Glass 只用于设计参考。高保真原型未经用户确认前，不开始正式 Android 业务代码。
 - `docs/DEVELOPMENT_LOG.md` 不得只写版本摘要；每次重要修改需记录需求背景、实现范围、数据兼容、真实失败与根因、修复办法、验证命令与结果、产物和已知限制。不得编造未记录的精确时间或过程。
 - 产品是中国大陆个人用户使用的本地收支记账工具，不得擅自扩展成企业财务系统。
 
@@ -21,33 +21,28 @@
 
 - 修改前先理解现有代码、测试和文档，不随意删除已有功能，不修改与当前任务无关的内容。
 - 优先修复根本原因；修改后必须执行与风险相称的类型检查、测试和构建。
-- 保持 UI、业务逻辑、SQLite 数据访问和 Electron 系统能力之间的边界，不把所有代码塞进一个文件。
+- 保持 UI、业务逻辑、SQLite 数据访问之间的边界，不把所有代码塞进一个文件。
 - 金额始终以整数“分”存储，界面显示时再转换为人民币元；不得使用浮点数直接持久化金额。
-- 所有渲染进程输入必须在主进程再次校验；不得启用 renderer Node 集成、关闭上下文隔离或关闭沙箱。
 - 不自动删除、覆盖或重建无法打开的数据库；恢复数据必须先校验、自动备份当前数据并使用事务。
-- 保持 Windows/macOS 共用主要代码，不加入没有充分理由的 Windows 独占依赖。
 - 技术解释、用户文档和最终报告优先使用简体中文与普通人能理解的语言。
 
 ## 文件、环境与依赖
 
 - 当前路径包含中文和空格，不得仅因为“可能有问题”迁移项目；只有出现可复现错误时才记录并报告。
-- 大型依赖与缓存优先留在 D 盘；Windows工程通过 `apps/windows-desktop/.npmrc` 把 npm 缓存放在该工程的 `.cache/npm`。
+- 大型依赖与缓存优先留在 D 盘。
 - 优先使用现有环境。新增系统软件、付费服务、账号或证书前必须说明并等待用户批准。
-- 依赖必须由 `package-lock.json` 锁定；升级 Electron 时需同时验证 `better-sqlite3`、electron-vite、electron-builder、端到端测试和安装包。
-- 不提交 `node_modules`、缓存、构建产物、用户数据库、日志或凭据。
+- 依赖必须由 Gradle 锁定版本；不提交 `node_modules`、缓存、构建产物、用户数据库、日志或凭据。
 
 ## Git 操作授权与自动存档
 
-- 在用户完成 GitHub 私有源码仓库的创建、并明确确认本地项目已连接到该仓库前，Codex 不主动执行 GitHub 推送、创建远程仓库、公开发布源码或 APK。
-- 完成连接后，遇到重要修复、较大功能更新或正式版本发布，Codex 应自主判断并在检查、测试或构建通过后：创建一条本地 Git 提交（“游戏存档点”），再安全推送到用户已确认的 GitHub 私有源码仓库。
+- 源码仓库 `olo12119/heima-accounting-source` 现为公开仓库；发布仓库 `olo12119/heima-accounting-releases` 仅存放安装包与说明。
+- 遇到重要修复、较大功能更新或正式版本发布，Codex 应自主判断并在检查、测试或构建通过后：创建一条本地 Git 提交（“游戏存档点”），再安全推送到已确认的源码仓库。
 - 每次自动存档和推送后，必须告知用户：存档编号、存档名称、推送目标、以及用户如何在 GitHub 上查看该存档。
-- 自动推送仅限正常新增提交；不得自行执行强制推送、改写历史、删除远程内容、切换到未确认的远程仓库，或将源码仓库改为公开。
-- APK 的公开发布、创建公开发布仓库、上传签名文件/凭据或其他敏感内容，仍必须由用户在当次明确同意后才可执行。
+- 自动推送仅限正常新增提交；不得自行执行强制推送、改写历史、删除远程内容、切换到未确认的远程仓库。
+- APK 的公开发布、上传签名文件/凭据或其他敏感内容，必须由用户在当次明确同意后才可执行；签名密钥不得提交到仓库。
 - 用户希望亲自学习 GitHub 上传时，Codex 应采用教学方式：每一步说明目的、界面上应点击的位置、完成后会看到什么；用户自行操作后再继续下一步。除非用户明确要求代操作，Codex 不代替用户登录账号或上传。
 
 ## 完成标准
 
-- Windows工程至少在 `apps/windows-desktop` 中运行 `npm run typecheck`、`npm run lint`、`npm test` 和 `npm run build`。Android正式工程建立后必须另行记录其准确检查命令。
-- 影响主流程时还需运行 `npm run test:e2e`；影响安装或依赖时需运行对应平台打包命令。
+- Android 工程在 `apps/android` 中运行 `./gradlew test` 等测试与 `./gradlew assembleRelease` 构建；具体命令以 `docs/android/BUILD_AND_TEST.md` 为准。
 - 更新功能时同步维护 PRODUCT、ARCHITECTURE、BUILD、USER_GUIDE 与 DEVELOPMENT_LOG 中受影响的内容。
-- macOS 构建只能在 Mac 上宣称实际成功；无签名证书时必须明确说明安装包未签名。

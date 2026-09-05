@@ -2,7 +2,7 @@
 
 ## 新手查看界面
 
-1. 双击项目根目录 `00-用Android Studio查看手机版.cmd`。
+1. 双击 `scripts/用Android-Studio查看手机版.cmd`。
 2. 等待同步完成，选择 `Heima_Android_16`。
 3. 点击绿色三角形。
 4. 检查完点击红色方块停止 App。

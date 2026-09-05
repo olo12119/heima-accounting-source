@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">黑马记账</title>
-  <rect width="64" height="64" rx="17" fill="#19342d"/>
-  <path d="M18 45V22.5c0-2.2 1.8-4 4-4h5l5-6.5 4.2 7.2c7.2 1.7 11.8 7.9 11.8 15.4V45h-7V34.8c0-5-3.5-8.8-8.6-8.8H25v19h-7Z" fill="#f4f1e8"/>
-  <path d="M31 31h8.5M31 37h8.5" stroke="#d5a85e" stroke-width="3" stroke-linecap="round"/>
-  <circle cx="40.5" cy="24.2" r="1.7" fill="#d5a85e"/>
-</svg>

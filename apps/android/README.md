@@ -1,6 +1,6 @@
 # 黑马记账 Android 1.1.0
 
-这是与 Windows 桌面版分开的 Android 原生正式工程。
+这是黑马记账的 Android 原生正式工程。
 
 ## 技术栈
 
@@ -24,10 +24,10 @@
 
 普通用户安装根目录 `手机安装包/黑马记账-Android-正式版-1.1.0.apk`。
 
-开发者从根目录双击 `00-用Android Studio查看手机版.cmd`，或按 `../../docs/android/BUILD_AND_TEST.md` 使用 D 盘工具链构建。
+开发者双击 `scripts/用Android-Studio查看手机版.cmd`，或按 `../../docs/android/BUILD_AND_TEST.md` 使用 D 盘工具链构建。
 
 ## 重要边界
 
 - 本地签名密钥位于忽略 Git 的 `.local-signing`，必须单独备份。
 - APK、构建目录、Gradle 缓存、模拟器和用户数据库不进入 Git。
-- 模拟器不能代表真机耗电和温度；真实性能边界见 `../../PERFORMANCE_REPORT.md`。
+- 模拟器不能代表真机耗电和温度；真实性能边界见 `../../docs/reports/PERFORMANCE_REPORT.md`。

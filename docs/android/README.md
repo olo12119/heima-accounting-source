@@ -29,4 +29,4 @@ Android 原生正式版 `1.1.0` 已完成。iCost、Apple 原生应用、visionO
 - 统一 UI / Motion / Material 系统、手动 GitHub Release 更新检查，以及 55 项专项核验。
 - 严格 Release Lint、38 项 JVM 测试、40 项模拟器数据库/UI/手势测试、R8 构建和正式签名。
 
-Windows 版仍保留为独立产品线；删除 Android App 不会修改 Windows 数据，反过来也一样。
+本项目当前只维护 Android 手机版。

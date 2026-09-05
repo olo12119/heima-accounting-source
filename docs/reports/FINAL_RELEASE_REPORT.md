@@ -61,4 +61,4 @@ app（Compose 页面、Pager、Sheet、更新检查与一次性事件）
 - ✅ 55 项专项清单：53 项 `✅`、2 项 `⚠️`、0 项 `❌`。
 - ⚠️ 真实音色、触觉手感、耗电、温升、厂商 GPU 与 90/120Hz 为 `NEEDS REAL DEVICE VERIFICATION`。
 
-详细证据见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和根目录 `UI_MOTION_MATERIAL_REPORT.md`。
+详细证据见 `TEST_REPORT.md`、`PERFORMANCE_REPORT.md`、`UX_REGRESSION_REPORT.md` 和 `docs/reports/UI_MOTION_MATERIAL_REPORT.md`。

@@ -38,7 +38,7 @@ Compose依赖使用BOM `2026.08.00`，最低系统为Android 10（API 29），�
 
 ## D盘环境与推荐入口
 
-项目根目录的 `00-用Android Studio查看手机版.cmd` 会在每次启动时明确设置下列D盘路径。它们只对由该入口打开的Android Studio生效，不会污染整个Windows环境：
+`scripts/用Android-Studio查看手机版.cmd` 会在每次启动时明确设置下列D盘路径。它们只对由该入口打开的Android Studio生效，不会污染整个Windows环境：
 
 ```text
 JAVA_HOME=D:\AndroidDev\Jdk\jdk-17.0.20.1+1
