@@ -115,6 +115,9 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun exportCsv(): String = repository.exportCsv()
     suspend fun loadStatistics(range: DateRange): StatisticsResult = repository.statistics(range)
 
+    /** 四期 B6：下拉刷新重读 repository 状态流（内存态重算，几乎瞬时）。 */
+    fun refresh() = launchOperation { repository.refresh() }
+
     fun restoreBackup(json: String) = launchOperation {
         val safetyFile = repository.restoreBackup(json)
         mutableEvents.emit(UiEvent.BackupRestored(safetyFile))

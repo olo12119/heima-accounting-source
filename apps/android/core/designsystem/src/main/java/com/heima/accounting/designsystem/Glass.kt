@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
@@ -53,6 +53,75 @@ val LocalHeimaBackdrop: ProvidableCompositionLocal<Backdrop?> =
  */
 val LocalHeimaScrolling: ProvidableCompositionLocal<Boolean> =
     staticCompositionLocalOf { false }
+
+/**
+ * 四期玻璃质感 helper（§3.4）：把 rim / sheen / 表面渐变收敛为唯一真相，
+ * 页面禁止硬编码 alpha 值。浅深两档都写在这里。
+ */
+
+/** 玻璃表面渐变（backdrop 实时采样路径的 onDrawSurface 填充）。 */
+internal fun glassSurfaceFill(
+    palette: HeimaPalette,
+    dark: Boolean,
+    width: Float,
+    height: Float,
+): Brush = Brush.linearGradient(
+    colors = if (dark) {
+        listOf(
+            palette.surface.copy(alpha = .34f),
+            palette.brandSoft.copy(alpha = .18f),
+            palette.surface.copy(alpha = .24f),
+        )
+    } else {
+        listOf(
+            palette.surface.copy(alpha = .22f),
+            palette.brandSoft.copy(alpha = .16f),
+            palette.surface.copy(alpha = .14f),
+        )
+    },
+    start = Offset.Zero,
+    end = Offset(width, height),
+)
+
+/** 玻璃 rim 渐变描边（顶部高光 → 侧边微光 → 品牌色 → 透明）。 */
+internal fun glassRimBrush(
+    palette: HeimaPalette,
+    dark: Boolean,
+    width: Float,
+    height: Float,
+): Brush = Brush.linearGradient(
+    colors = listOf(
+        palette.glassHighlight.copy(alpha = if (dark) 0.34f else 0.72f),
+        palette.glassHighlight.copy(alpha = if (dark) 0.22f else 0.40f),
+        palette.brand.copy(alpha = if (dark) 0.18f else 0.16f),
+        Color.Transparent,
+    ),
+    start = Offset.Zero,
+    end = Offset(width, height),
+)
+
+/** 玻璃内高光 sheen（左上角柔光，深色已由 .045 → .07 提亮）。 */
+internal fun glassSheenBrush(
+    palette: HeimaPalette,
+    material: HeimaMotion,
+    quality: VisualQuality,
+    width: Float,
+    height: Float,
+): Brush = Brush.radialGradient(
+    colors = listOf(
+        Color.White.copy(
+            alpha = when {
+                !material.liquidGlassEnabled -> 0f
+                material.darkTheme -> 0.07f
+                quality == VisualQuality.POWER_SAVER -> 0.12f
+                else -> 0.32f
+            },
+        ),
+        Color.Transparent,
+    ),
+    center = Offset(width * 0.20f, height * 0.02f),
+    radius = maxOf(width, height) * 0.82f,
+)
 
 @Composable
 fun GlassSurface(
@@ -82,7 +151,7 @@ fun GlassSurface(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
             effects = {
-                vibrancy()
+                colorControls(saturation = 1.8f)
                 blur(spec.blurRadius.toPx())
                 lens(
                     refractionHeight = spec.refractionHeight.toPx(),
@@ -91,27 +160,11 @@ fun GlassSurface(
                 )
             },
             highlight = { Highlight.Default.copy(alpha = spec.highlightAlpha) },
-            shadow = { Shadow(alpha = if (material.darkTheme) .20f else .28f) },
+            shadow = { Shadow(alpha = if (material.darkTheme) .24f else .30f) },
             innerShadow = { InnerShadow(radius = 5.dp, alpha = spec.innerShadowAlpha) },
             onDrawSurface = {
                 drawRect(
-                    brush = Brush.linearGradient(
-                        colors = if (material.darkTheme) {
-                            listOf(
-                                palette.surface.copy(alpha = .34f),
-                                palette.brandSoft.copy(alpha = .18f),
-                                palette.surface.copy(alpha = .24f),
-                            )
-                        } else {
-                            listOf(
-                                palette.surface.copy(alpha = .22f),
-                                palette.brandSoft.copy(alpha = .16f),
-                                palette.surface.copy(alpha = .14f),
-                            )
-                        },
-                        start = Offset.Zero,
-                        end = Offset(size.width, size.height),
-                    ),
+                    brush = glassSurfaceFill(palette, material.darkTheme, size.width, size.height),
                 )
             },
         )
@@ -131,7 +184,7 @@ fun GlassSurface(
             .shadow(
                 elevation = if (elevation == 14.dp) spec.shadowLevel.elevation() else elevation,
                 shape = shape,
-                ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .42f else .16f),
+                ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .48f else .22f),
                 spotColor = palette.glassShadow,
             )
             .clip(shape)
@@ -145,31 +198,8 @@ fun GlassSurface(
             )
             .drawWithCache {
                 val radiusPx = cornerRadius.toPx()
-                val rim = Brush.linearGradient(
-                    colors = listOf(
-                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.30f else 0.72f),
-                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.18f else 0.36f),
-                        palette.brand.copy(alpha = 0.14f),
-                        Color.Transparent,
-                    ),
-                    start = Offset.Zero,
-                    end = Offset(size.width, size.height),
-                )
-                val sheen = Brush.radialGradient(
-                    colors = listOf(
-                        Color.White.copy(
-                            alpha = when {
-                                !material.liquidGlassEnabled -> 0f
-                                material.darkTheme -> 0.045f
-                                quality == VisualQuality.POWER_SAVER -> 0.12f
-                                else -> 0.32f
-                            },
-                        ),
-                        Color.Transparent,
-                    ),
-                    center = Offset(size.width * 0.20f, size.height * 0.02f),
-                    radius = size.maxDimension * 0.82f,
-                )
+                val rim = glassRimBrush(palette, material.darkTheme, size.width, size.height)
+                val sheen = glassSheenBrush(palette, material, quality, size.width, size.height)
                 onDrawWithContent {
                     // The sheen belongs behind text and icons. Drawing it above the content
                     // was the root cause of washed-out labels in the old dark theme.
@@ -187,7 +217,7 @@ fun GlassSurface(
                             style = Stroke(width = 1.4.dp.toPx()),
                         )
                         drawLine(
-                            color = palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.30f else 0.38f),
+                            color = palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.50f else 0.55f),
                             start = Offset(radiusPx * 0.72f, 1.4.dp.toPx()),
                             end = Offset(size.width - radiusPx * 0.72f, 1.4.dp.toPx()),
                             strokeWidth = 1.2.dp.toPx(),
@@ -292,6 +322,8 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                 val firstRadius = size.minDimension * 0.66f
                 val secondRadius = size.minDimension * 0.54f
                 val thirdRadius = size.minDimension * 0.42f
+                val fourthRadius = size.minDimension * 0.52f
+                val fifthRadius = size.minDimension * 0.70f
                 val ribbon = Path().apply {
                     moveTo(-size.width * 0.12f, size.height * 0.32f)
                     cubicTo(
@@ -308,10 +340,10 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 palette.ambientOne.copy(alpha = when {
-                                    material.darkTheme && decorationsEnabled -> 0.24f
-                                    decorationsEnabled -> 0.62f
-                                    material.darkTheme -> 0.12f
-                                    else -> 0.24f
+                                    material.darkTheme && decorationsEnabled -> 0.40f
+                                    decorationsEnabled -> 0.85f
+                                    material.darkTheme -> 0.18f
+                                    else -> 0.30f
                                 }),
                                 Color.Transparent,
                             ),
@@ -325,10 +357,10 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 palette.ambientTwo.copy(alpha = when {
-                                    material.darkTheme && decorationsEnabled -> 0.18f
-                                    decorationsEnabled -> 0.42f
-                                    material.darkTheme -> 0.10f
-                                    else -> 0.18f
+                                    material.darkTheme && decorationsEnabled -> 0.32f
+                                    decorationsEnabled -> 0.60f
+                                    material.darkTheme -> 0.14f
+                                    else -> 0.24f
                                 }),
                                 Color.Transparent,
                             ),
@@ -342,10 +374,10 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 palette.brandSoft.copy(alpha = when {
-                                    material.darkTheme && decorationsEnabled -> 0.15f
-                                    decorationsEnabled -> 0.32f
-                                    material.darkTheme -> 0.08f
-                                    else -> 0.12f
+                                    material.darkTheme && decorationsEnabled -> 0.22f
+                                    decorationsEnabled -> 0.45f
+                                    material.darkTheme -> 0.10f
+                                    else -> 0.18f
                                 }),
                                 Color.Transparent,
                             ),
@@ -355,13 +387,49 @@ fun AmbientBackdrop(modifier: Modifier = Modifier) {
                         radius = thirdRadius,
                         center = Offset(size.width * 0.78f, size.height * 0.60f),
                     )
+                    // 四期新增色斑 4（accent，左上，更大更亮）
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                palette.accent.copy(alpha = when {
+                                    material.darkTheme && decorationsEnabled -> 0.28f
+                                    decorationsEnabled -> 0.50f
+                                    material.darkTheme -> 0.12f
+                                    else -> 0.20f
+                                }),
+                                Color.Transparent,
+                            ),
+                            center = Offset(size.width * 0.12f, size.height * 0.10f),
+                            radius = fourthRadius,
+                        ),
+                        radius = fourthRadius,
+                        center = Offset(size.width * 0.12f, size.height * 0.10f),
+                    )
+                    // 四期新增色斑 5（brand，右下，面积最大）
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                palette.brand.copy(alpha = when {
+                                    material.darkTheme && decorationsEnabled -> 0.20f
+                                    decorationsEnabled -> 0.38f
+                                    material.darkTheme -> 0.09f
+                                    else -> 0.15f
+                                }),
+                                Color.Transparent,
+                            ),
+                            center = Offset(size.width * 0.92f, size.height * 0.82f),
+                            radius = fifthRadius,
+                        ),
+                        radius = fifthRadius,
+                        center = Offset(size.width * 0.92f, size.height * 0.82f),
+                    )
                     if (decorationsEnabled) {
                         drawPath(
                             path = ribbon,
                             brush = Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color.White.copy(alpha = if (material.darkTheme) 0.07f else 0.25f), Color.Transparent),
+                                listOf(Color.Transparent, Color.White.copy(alpha = if (material.darkTheme) 0.14f else 0.45f), Color.Transparent),
                             ),
-                            style = Stroke(width = 22.dp.toPx()),
+                            style = Stroke(width = 30.dp.toPx()),
                         )
                     }
                 }

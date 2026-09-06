@@ -180,7 +180,7 @@ class NavigationAndRecordTest {
         composeRule.onNodeWithContentDescription("输入数字5").performClick()
         composeRule.onNodeWithText("餐饮", substring = false).performClick()
         composeRule.onNodeWithText("保存", substring = false).performClick()
-        composeRule.onNodeWithText("账单已保存", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("账单已保存 ✓", substring = false).assertIsDisplayed()
     }
 
     @Test
@@ -198,7 +198,7 @@ class NavigationAndRecordTest {
         composeRule.onNodeWithContentDescription("选择餐饮分类").performClick()
         composeRule.onNodeWithContentDescription("选择午餐细分").performClick()
         composeRule.onNodeWithText("保存", substring = false).performClick()
-        composeRule.onNodeWithText("账单已保存", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("账单已保存 ✓", substring = false).assertIsDisplayed()
     }
 
     @Test
@@ -208,7 +208,7 @@ class NavigationAndRecordTest {
         enterOneYuan()
         composeRule.onNodeWithContentDescription("选择工资分类").performClick()
         composeRule.onNodeWithText("保存", substring = false).performClick()
-        composeRule.onNodeWithText("账单已保存", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("账单已保存 ✓", substring = false).assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("打开记账面板").performClick()
         composeRule.onNodeWithContentDescription("收支类型：收入").performClick()
@@ -216,7 +216,7 @@ class NavigationAndRecordTest {
         composeRule.onNodeWithContentDescription("选择工资分类").performClick()
         composeRule.onNodeWithContentDescription("选择奖金细分").performClick()
         composeRule.onNodeWithText("保存", substring = false).performClick()
-        composeRule.onNodeWithText("账单已保存", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("账单已保存 ✓", substring = false).assertIsDisplayed()
     }
 
     @Test
@@ -502,7 +502,7 @@ class NavigationAndRecordTest {
         enterOneYuan()
         composeRule.onNodeWithContentDescription("选择餐饮分类").performClick()
         composeRule.onNodeWithText("保存", substring = false).performClick()
-        composeRule.onNodeWithText("账单已保存", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("账单已保存 ✓", substring = false).assertIsDisplayed()
     }
 
     private fun setSwitch(description: String, enabled: Boolean) {

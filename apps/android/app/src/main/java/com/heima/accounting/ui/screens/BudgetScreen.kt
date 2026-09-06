@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassFieldSurface
-import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
@@ -53,8 +52,10 @@ import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.MonthlyBudget
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.formatYuan
+import com.heima.accounting.ui.AnimatedAmount
 import com.heima.accounting.ui.AnimatedBudgetGauge
 import com.heima.accounting.ui.CategoryIcon
+import com.heima.accounting.ui.FluidPillSelector
 import com.heima.accounting.ui.GlassTextInputDialog
 import com.heima.accounting.ui.HeimaDialogFrame
 import com.heima.accounting.ui.SensitiveAmountText
@@ -72,6 +73,7 @@ fun BudgetScreen(
     snapshot: LedgerSnapshot,
     amountsVisible: Boolean,
     onSaveBudget: (MonthlyBudget) -> Unit,
+    onBudgetExceeded: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val reduceMotion = HeimaTheme.motion.reduceMotion
@@ -92,6 +94,21 @@ fun BudgetScreen(
     var editingCap by remember { mutableStateOf(false) }
     var editingCategories by remember { mutableStateOf(false) }
 
+    // 四期 E4：预算超额触发一次闷响（回落到 ≤100% 后可再次触发）。
+    val overallEvaluation = remember(budget, summary, effectiveMode) {
+        budget?.takeIf { it.mode == effectiveMode }?.let { FinanceRules.budgetEvaluation(it, summary) }
+    }
+    var exceededSignaled by remember { mutableStateOf(false) }
+    LaunchedEffect(overallEvaluation?.usageRatio) {
+        val ratio = overallEvaluation?.usageRatio ?: 0f
+        if (ratio > 1f && !exceededSignaled) {
+            exceededSignaled = true
+            onBudgetExceeded()
+        } else if (ratio <= 1f) {
+            exceededSignaled = false
+        }
+    }
+
     val listState = rememberLazyListState()
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -101,7 +118,7 @@ fun BudgetScreen(
     ) {
         item { ScreenHeading("预算", "给生活留一点从容") }
         item {
-            GlassSegmentedControl(
+            FluidPillSelector(
                 options = listOf(
                     BudgetMode.SAVINGS_GOAL to "先存后花",
                     BudgetMode.MONTHLY_CAP to "整月上限",
@@ -109,7 +126,7 @@ fun BudgetScreen(
                 ),
                 selected = effectiveMode,
                 onSelected = { mode ->
-                    if (mode == effectiveMode) return@GlassSegmentedControl
+                    if (mode == effectiveMode) return@FluidPillSelector
                     val current = budget
                     val canPersist = when (mode) {
                         BudgetMode.MONTHLY_CAP -> current != null
@@ -127,7 +144,6 @@ fun BudgetScreen(
                         pendingMode = mode
                     }
                 },
-                accessibilityLabel = "预算模式",
             )
         }
         item {
@@ -246,11 +262,11 @@ private fun SavingsGoalHero(
                     if (evaluation == null) {
                         Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                     } else {
-                        SensitiveAmountText(
-                            evaluation.limitCents!!.coerceAtLeast(0L),
-                            amountsVisible,
-                            MaterialTheme.typography.headlineSmall,
-                            palette.textPrimary,
+                        AnimatedAmount(
+                            targetCents = evaluation.limitCents!!.coerceAtLeast(0L),
+                            visible = amountsVisible,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = palette.textPrimary,
                         )
                     }
                 }
@@ -315,7 +331,12 @@ private fun MonthlyCapHero(
                     if (budget == null) {
                         Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                     } else {
-                        SensitiveAmountText(budget.amountCents, amountsVisible, MaterialTheme.typography.headlineSmall, palette.textPrimary)
+                        AnimatedAmount(
+                            targetCents = budget.amountCents,
+                            visible = amountsVisible,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = palette.textPrimary,
+                        )
                     }
                 }
             }
@@ -370,11 +391,11 @@ private fun CategoryBudgetHero(
                     if (rows.isEmpty()) {
                         Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                     } else {
-                        SensitiveAmountText(
-                            rows.sumOf { it.spentCents },
-                            amountsVisible,
-                            MaterialTheme.typography.headlineSmall,
-                            palette.textPrimary,
+                        AnimatedAmount(
+                            targetCents = rows.sumOf { it.spentCents },
+                            visible = amountsVisible,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = palette.textPrimary,
                         )
                     }
                 }

@@ -1,5 +1,6 @@
 package com.heima.accounting.ui
 
+import android.content.Context
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -122,6 +123,7 @@ fun HeimaShell(
     var editing by remember { mutableStateOf<Transaction?>(null) }
     var restoreCandidate by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf<String?>(null) }
+    var successBubbleVisible by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val motion = HeimaTheme.motion
@@ -158,8 +160,17 @@ fun HeimaShell(
             when (event) {
                 is UiEvent.Message -> snackbar.showSnackbar(event.text, duration = SnackbarDuration.Short)
                 is UiEvent.TransactionSaved -> {
-                    feedback.confirm()
-                    snackbar.showSnackbar("账单已保存", duration = SnackbarDuration.Short)
+                    // 首次记账成功播琶音（全局仅一次，拍板 5）；之后走普通确认音。
+                    val oncePrefs = context.getSharedPreferences("heima_once_flags", Context.MODE_PRIVATE)
+                    val played = oncePrefs.getBoolean("first_record_aria_played", false)
+                    if (!played) {
+                        oncePrefs.edit().putBoolean("first_record_aria_played", true).apply()
+                        feedback.firstRecordSuccess()
+                    } else {
+                        feedback.confirm()
+                    }
+                    // 风险 3：成功气泡替代原"账单已保存"Snackbar，避免叠显；撤销/错误仍走 Snackbar。
+                    successBubbleVisible = true
                 }
                 is UiEvent.TransactionDeleted -> {
                     feedback.important()
@@ -288,15 +299,20 @@ fun HeimaShell(
                                 },
                                 { navigateToSecondary(ManagementPage.RECORDS) },
                                 { editing = it.let { id -> ledgerState.snapshot.transactions.firstOrNull { transaction -> transaction.id == id } }; recordPanelVisible = editing != null },
+                                onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                onRefreshHome = { viewModel.refresh() },
                                 feedback::selection,
+                                onAmountSettled = feedback::amountSettled,
                             )
                             AppDestination.STATISTICS -> StatisticsScreen(
                                 ledgerState.snapshot,
                                 amountsVisible,
                                 viewModel::loadStatistics,
                                 feedback::selection,
+                                onSwitchFeedback = feedback::switch,
+                                onAmountSettled = feedback::amountSettled,
                             )
-                            AppDestination.BUDGET -> BudgetScreen(ledgerState.snapshot, amountsVisible, viewModel::saveBudget)
+                            AppDestination.BUDGET -> BudgetScreen(ledgerState.snapshot, amountsVisible, viewModel::saveBudget, onBudgetExceeded = feedback::budgetExceeded)
                             AppDestination.PROFILE -> ProfileScreen(
                                 ledgerState.snapshot.transactions.size, themeStyle, colorMode,
                                 soundEnabled, hapticEnabled, liquidGlassEnabled, reduceMotion,
@@ -356,6 +372,12 @@ fun HeimaShell(
                     }
                 }
             }
+            SuccessBubble(
+                text = "账单已保存 ✓",
+                visible = successBubbleVisible,
+                onDismiss = { successBubbleVisible = false },
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 108.dp),
+            )
                 if (recordPanelVisible) {
                     RecordSheet(
                         ledgerState.snapshot,
@@ -367,6 +389,7 @@ fun HeimaShell(
                         { recordVisibilityProgress = it },
                         viewModel::addSubcategory,
                         feedback::error,
+                        onKeyTick = feedback::keyTick,
                     )
                 }
             }

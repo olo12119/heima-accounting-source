@@ -24,8 +24,8 @@ import kotlin.math.sin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal enum class InteractionSound { CONFIRM, IMPORTANT, UNDO }
-internal enum class HapticCue { CONFIRM, IMPORTANT, SELECTION, REJECT }
+internal enum class InteractionSound { CONFIRM, IMPORTANT, UNDO, KEY_TICK, SWITCH_WHOOSH, DING, OVER_BUDGET, FIRST_ARIA }
+internal enum class HapticCue { CONFIRM, IMPORTANT, SELECTION, REJECT, MEDIUM_TICK }
 
 /** Sound, haptic and visual feedback remain independent user-facing systems. */
 @Stable
@@ -39,6 +39,15 @@ class InteractionFeedback internal constructor(
     fun confirm() = emit(InteractionSound.CONFIRM, HapticCue.CONFIRM)
     fun important() = emit(InteractionSound.IMPORTANT, HapticCue.IMPORTANT)
     fun undo() = emit(InteractionSound.UNDO, HapticCue.CONFIRM)
+
+    // 四期新增音效事件（E1~E5）
+    fun keyTick() = emit(InteractionSound.KEY_TICK, HapticCue.SELECTION)
+    fun switch() = emit(InteractionSound.SWITCH_WHOOSH, HapticCue.MEDIUM_TICK)
+    fun amountSettled() {
+        if (soundEnabled()) playSound(InteractionSound.DING)
+    }
+    fun budgetExceeded() = emit(InteractionSound.OVER_BUDGET, HapticCue.IMPORTANT)
+    fun firstRecordSuccess() = emit(InteractionSound.FIRST_ARIA, HapticCue.CONFIRM)
 
     fun selection() {
         if (hapticEnabled()) performHaptic(HapticCue.SELECTION)
@@ -131,6 +140,48 @@ private val SoundRecipes = mapOf(
         totalDurationMs = 225,
         volume = .25f,
     ),
+    // 键盘轻咔（E1）
+    InteractionSound.KEY_TICK to SoundRecipe(
+        notes = listOf(
+            SynthNote(frequencyHz = 1760.00, startMs = 0, durationMs = 40, partials = BrightPartials, attackMs = 2, decayDivisor = 2.0),
+        ),
+        totalDurationMs = 40,
+        volume = .16f,
+    ),
+    // 图表切换嗡（E2）
+    InteractionSound.SWITCH_WHOOSH to SoundRecipe(
+        notes = listOf(
+            SynthNote(frequencyHz = 220.00, startMs = 0, durationMs = 40, partials = SoftPartials, attackMs = 3, decayDivisor = 2.0),
+        ),
+        totalDurationMs = 40,
+        volume = .18f,
+    ),
+    // 数字滚动到位（E3）
+    InteractionSound.DING to SoundRecipe(
+        notes = listOf(
+            SynthNote(frequencyHz = 1318.51, startMs = 0, durationMs = 130, partials = BrightPartials, attackMs = 4, decayDivisor = 3.4),
+        ),
+        totalDurationMs = 130,
+        volume = .24f,
+    ),
+    // 预算超额闷响（E4）
+    InteractionSound.OVER_BUDGET to SoundRecipe(
+        notes = listOf(
+            SynthNote(frequencyHz = 174.61, startMs = 0, durationMs = 200, partials = SoftPartials, attackMs = 8, decayDivisor = 3.2),
+        ),
+        totalDurationMs = 200,
+        volume = .26f,
+    ),
+    // 首次记账琶音 C5 → E5 → G5（E5）
+    InteractionSound.FIRST_ARIA to SoundRecipe(
+        notes = listOf(
+            SynthNote(frequencyHz = 523.25, startMs = 0, durationMs = 110, partials = BrightPartials),
+            SynthNote(frequencyHz = 659.26, startMs = 70, durationMs = 120, partials = BrightPartials),
+            SynthNote(frequencyHz = 783.99, startMs = 140, durationMs = 150, partials = BrightPartials),
+        ),
+        totalDurationMs = 290,
+        volume = .28f,
+    ),
 )
 
 /** 同一事件两次播放间隔小于该值时直接丢弃，避免连点叠爆。 */
@@ -218,6 +269,12 @@ fun rememberInteractionFeedback(
                     HapticCue.CONFIRM -> haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                     HapticCue.IMPORTANT -> haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     HapticCue.SELECTION -> haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    // 比 SELECTION 高一档、比 CONFIRM 低一档：连续两次轻 tick。
+                    HapticCue.MEDIUM_TICK -> scope.launch {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        delay(40)
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
                 }
             },
             soundEnabled = soundEnabled,

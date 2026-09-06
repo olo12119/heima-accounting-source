@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -106,6 +107,7 @@ fun RecordSheet(
     onVisibilityProgress: (Float) -> Unit = {},
     onAddSubcategory: suspend (parentId: String, type: EntryType, name: String, iconKey: String, colorArgb: Long) -> Category? = { _, _, _, _, _ -> null },
     onErrorFeedback: () -> Unit = {},
+    onKeyTick: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -129,6 +131,16 @@ fun RecordSheet(
     var error by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dismissing by remember { mutableStateOf(false) }
+    // B18：金额橡皮筋（每次按键 scale 1.12 → 1 spring 回弹）。
+    val amountScale = remember { Animatable(1f) }
+    LaunchedEffect(amountInput) {
+        if (amountInput.isNotEmpty() && !motion.reduceMotion) {
+            amountScale.snapTo(1.12f)
+            amountScale.animateTo(1f, spring(dampingRatio = .72f, stiffness = 520f))
+        } else {
+            amountScale.snapTo(1f)
+        }
+    }
     val entranceOffset = remember { Animatable(with(density) { 28.dp.toPx() }) }
     val scrimAlpha = remember { Animatable(0f) }
     val handleInteraction = remember { MutableInteractionSource() }
@@ -151,8 +163,9 @@ fun RecordSheet(
             entranceOffset.snapTo(0f)
             scrimAlpha.snapTo(targetScrimAlpha)
         } else {
-            launch { scrimAlpha.animateTo(targetScrimAlpha, tween(HeimaMotionTokens.Fast)) }
-            entranceOffset.animateTo(0f, tween(HeimaMotionTokens.Fast, easing = FastOutSlowInEasing))
+            // B17：背景模糊 0.3s + 面板 spring 380ms。
+            launch { scrimAlpha.animateTo(targetScrimAlpha, tween(300)) }
+            entranceOffset.animateTo(0f, spring(dampingRatio = .88f, stiffness = 360f))
         }
     }
 
@@ -264,7 +277,7 @@ fun RecordSheet(
                 Spacer(Modifier.height(12.dp))
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.graphicsLayer { scaleX = amountScale.value; scaleY = amountScale.value }) {
                         Text("¥", color = palette.textPrimary, style = MaterialTheme.typography.headlineLarge)
                         Text(formatAmount(amountInput), color = palette.textPrimary, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.SemiBold)
                     }
@@ -369,6 +382,7 @@ fun RecordSheet(
                 NumericPad(
                     onKey = { amountInput = appendAmountInput(amountInput, it); error = null },
                     onDelete = { amountInput = amountInput.dropLast(1); error = null },
+                    onKeyTick = onKeyTick,
                     onSave = {
                         val cents = amountInputToCents(amountInput)
                         val category = primaryId
@@ -552,7 +566,20 @@ private fun SubcategoryDialogAction(
 @Composable
 private fun CategoryChoice(category: Category, selected: Boolean, onClick: () -> Unit) {
     val palette = HeimaTheme.palette
+    val motion = HeimaTheme.motion
     val interaction = remember { MutableInteractionSource() }
+    // B19：选中弹跳（scale 0.94 → 1.06 spring 200ms），切换旧缩回/新弹出。
+    val popScale = remember { Animatable(if (selected) 1.06f else 1f) }
+    LaunchedEffect(selected) {
+        if (motion.reduceMotion) {
+            popScale.snapTo(if (selected) 1.06f else 1f)
+        } else if (selected) {
+            popScale.snapTo(0.94f)
+            popScale.animateTo(1.06f, spring(dampingRatio = .7f, stiffness = 600f))
+        } else {
+            popScale.animateTo(1f, tween(150))
+        }
+    }
     Column(
         Modifier
             .width(70.dp)
@@ -565,7 +592,9 @@ private fun CategoryChoice(category: Category, selected: Boolean, onClick: () ->
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CategoryIcon(category.iconKey, selected, size = 60.dp)
+        Box(Modifier.graphicsLayer { scaleX = popScale.value; scaleY = popScale.value }) {
+            CategoryIcon(category.iconKey, selected, size = 60.dp)
+        }
         Spacer(Modifier.height(4.dp))
         val color by animateColorAsState(if (selected) palette.brand else palette.textSecondary, label = "category_label")
         Text(
@@ -579,14 +608,14 @@ private fun CategoryChoice(category: Category, selected: Boolean, onClick: () ->
 }
 
 @Composable
-private fun NumericPad(onKey: (String) -> Unit, onDelete: () -> Unit, onSave: () -> Unit) {
+private fun NumericPad(onKey: (String) -> Unit, onDelete: () -> Unit, onSave: () -> Unit, onKeyTick: () -> Unit = {}) {
     val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf(".", "0", "⌫"))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Column(Modifier.weight(3f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             rows.forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { key ->
-                        KeyButton(key, { if (key == "⌫") onDelete() else onKey(key) }, Modifier.weight(1f))
+                        KeyButton(key, { onKeyTick(); if (key == "⌫") onDelete() else onKey(key) }, Modifier.weight(1f))
                     }
                 }
             }
@@ -602,7 +631,7 @@ private fun KeyButton(text: String, onClick: () -> Unit, modifier: Modifier = Mo
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed && !motion.reduceMotion) .975f else 1f,
+        targetValue = if (pressed && !motion.reduceMotion) .93f else 1f,
         animationSpec = HeimaMotionTokens.responsive(motion.reduceMotion),
         label = "number_key_press",
     )

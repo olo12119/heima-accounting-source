@@ -3,6 +3,11 @@ package com.heima.accounting.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -65,7 +70,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 
 @Composable
 fun SensitiveAmountText(
@@ -117,6 +124,7 @@ fun AnimatedTrendChart(
         else if (!scrolling) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
     }
     var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
+    val zeroDash = dashedPathEffect()
     Box(modifier.semantics { contentDescription = "消费趋势图，共${totals.size}天数据" }) {
     Canvas(
         Modifier
@@ -181,17 +189,47 @@ fun AnimatedTrendChart(
         }
         drawPath(
             path = area,
-            brush = Brush.verticalGradient(
-                listOf(lineColor.copy(alpha = .18f), lineColor.copy(alpha = .015f)),
-                endY = baselineY,
+            brush = Brush.radialGradient(
+                listOf(lineColor.copy(alpha = .18f), lineColor.copy(alpha = .03f)),
+                center = Offset(size.width / 2f, baselineY * 0.5f),
+                radius = size.maxDimension * 0.75f,
             ),
         )
+        // D4：连续 0 天段用虚线（区分"无数据"与真实低值）。
+        if (visiblePoints.size >= 2) {
+            var runStart = -1
+            for (i in visiblePoints.indices) {
+                val isZero = values[i] == 0L
+                if (isZero && runStart < 0) runStart = i
+                if ((!isZero || i == visiblePoints.lastIndex) && runStart >= 0) {
+                    val end = if (isZero) i else i - 1
+                    if (end > runStart) {
+                        drawLine(
+                            color = lineColor.copy(alpha = .45f),
+                            start = points[runStart],
+                            end = points[end],
+                            strokeWidth = 3.dp.toPx(),
+                            cap = StrokeCap.Round,
+                            pathEffect = zeroDash,
+                        )
+                    }
+                    runStart = -1
+                }
+            }
+        }
         drawPath(
             path,
             color = lineColor,
             style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
         )
         if (progress.value >= .99f) {
+            // B10：末数据点粒子拖尾（回退 6 点，半径/alpha 递减）。
+            val trailCount = minOf(6, points.size - 1)
+            for (i in 1..trailCount) {
+                val p = points[points.size - 1 - i]
+                val t = i / 6f
+                drawCircle(lineColor.copy(alpha = 0.35f * (1f - t)), radius = (3.2f - 2.4f * t).dp.toPx(), center = p)
+            }
             val latest = points.last()
             drawCircle(lineColor.copy(alpha = .14f), radius = 7.dp.toPx(), center = latest)
             drawCircle(lineColor, radius = 3.dp.toPx(), center = latest)
@@ -268,17 +306,42 @@ fun AnimatedDonutChart(
                 },
         ) {
             val stroke = 16.dp.toPx()
-            drawCircle(palette.surfaceMuted, style = Stroke(stroke))
+            val glowWidth = 6.dp.toPx()
+            val center = center
+            val radius = size.minDimension / 2f - stroke / 2f
+            drawCircle(palette.surfaceMuted, radius = radius, center = center, style = Stroke(stroke))
             var start = -90f
             slices.forEachIndexed { index, slice ->
                 val color = colors.getOrElse(index) { palette.brand }
                 val sweep = 360f * slice.ratio * progress.value
                 val selected = selectedIndex == index
+                val dominant = slice.ratio > 0.85f
+                val midAngle = start + sweep / 2f
+                val midRad = Math.toRadians(midAngle.toDouble())
+                val shift = if (dominant) 4.dp.toPx() else 0f
+                val dx = cos(midRad).toFloat() * shift
+                val dy = sin(midRad).toFloat() * shift
+                val arcTopLeft = Offset(center.x - radius + dx, center.y - radius + dy)
+                val arcSize = Size(radius * 2f, radius * 2f)
+                // B9：主导切片（>85%）沿角平分线外推 4dp + 同色低 alpha 宽描边发光圈。
+                if (dominant) {
+                    drawArc(
+                        color = color.copy(alpha = .25f),
+                        startAngle = start,
+                        sweepAngle = sweep.coerceAtLeast(0f),
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(glowWidth, cap = StrokeCap.Round),
+                    )
+                }
                 drawArc(
                     color = color,
                     startAngle = start + if (selected) .8f else 1.2f,
                     sweepAngle = (sweep - if (selected) 1.6f else 2.4f).coerceAtLeast(0f),
                     useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
                     style = Stroke(
                         width = if (selected) 20.dp.toPx() else stroke,
                         cap = StrokeCap.Round,
@@ -324,6 +387,8 @@ fun AnimatedBarChart(
         else if (!scrolling) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
     }
     var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
+    val barColor = if (showIncome) palette.income else palette.brand
+    val barFill = chartFill(barColor)
     Box(modifier.semantics { contentDescription = "每日收支柱状图，共${totals.size}天数据" }) {
     Canvas(
         Modifier
@@ -360,7 +425,6 @@ fun AnimatedBarChart(
         val slotWidth = size.width / totals.size
         val barWidth = slotWidth * .56f
         val usableHeight = size.height - 9.dp.toPx()
-        val barColor = if (showIncome) palette.income else palette.brand
         values.forEachIndexed { index, value ->
             // Bars grow out of the baseline as the entrance animation progresses.
             val barHeight = value.toFloat() / maxValue * usableHeight * progress.value
@@ -370,7 +434,7 @@ fun AnimatedBarChart(
             val right = centerX + barWidth / 2f
             val top = baselineY - barHeight
             val corner = 3.dp.toPx().coerceAtMost(barWidth / 2f).coerceAtMost(barHeight)
-            val color = if (selectedIndex < 0 || selectedIndex == index) barColor else barColor.copy(alpha = .55f)
+            val dimmed = selectedIndex >= 0 && selectedIndex != index
             val bar = Path().apply {
                 moveTo(left, baselineY)
                 lineTo(left, top + corner)
@@ -380,7 +444,11 @@ fun AnimatedBarChart(
                 lineTo(right, baselineY)
                 close()
             }
-            drawPath(bar, color)
+            if (dimmed) {
+                drawPath(bar, barColor.copy(alpha = .55f))
+            } else {
+                drawPath(bar, barFill)
+            }
         }
     }
     totals.getOrNull(selectedIndex)?.let { selected ->
@@ -515,15 +583,46 @@ fun AnimatedBudgetGauge(
         if (!reduceMotion) progress.animateTo(target, tween(520, easing = FastOutSlowInEasing))
         else progress.snapTo(target)
     }
+    val over = ratio > 1f
+    val warn = ratio >= 0.85f
+    val color = when {
+        over -> palette.expense
+        warn -> palette.warning
+        else -> palette.brand
+    }
+    // B13：>0.85 轻微脉动（reduceMotion 短路）。
+    val pulse = if (reduceMotion || !warn) {
+        1f
+    } else {
+        val infinite = rememberInfiniteTransition(label = "gauge_pulse")
+        infinite.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.06f,
+            animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
+            label = "gauge_pulse_scale",
+        ).value
+    }
     Canvas(modifier.semantics { contentDescription = "预算已使用${(ratio * 100).toInt()}%" }) {
-        val stroke = 12.dp.toPx()
-        val color = when {
-            ratio > 1f -> palette.expense
-            ratio >= 0.85f -> palette.warning
-            else -> palette.brand
-        }
+        val stroke = 10.dp.toPx()
+        // 双层能量液：外圈浅底环 + 内层品牌色渐变进度弧。
         drawArc(palette.surfaceMuted, 140f, 260f, false, style = Stroke(stroke, cap = StrokeCap.Round))
-        drawArc(color, 140f, 260f * progress.value.coerceAtMost(1f), false, style = Stroke(stroke, cap = StrokeCap.Round))
+        drawArc(
+            brush = Brush.sweepGradient(listOf(color.copy(alpha = .55f), color), center = center),
+            startAngle = 140f,
+            sweepAngle = 260f * progress.value.coerceAtMost(1f),
+            useCenter = false,
+            style = Stroke(stroke, cap = StrokeCap.Round),
+        )
+        // 头部圆点 + 小拖尾光晕。
+        val angleDeg = 140f + 260f * progress.value.coerceAtMost(1f)
+        val radius = size.minDimension / 2f - stroke / 2f
+        val rad = Math.toRadians(angleDeg.toDouble())
+        val head = Offset(
+            center.x + radius * cos(rad).toFloat(),
+            center.y + radius * sin(rad).toFloat(),
+        )
+        drawCircle(color.copy(alpha = .20f), radius = 8.dp.toPx(), center = head)
+        drawCircle(color, radius = 5.dp.toPx() * pulse, center = head)
     }
 }
 

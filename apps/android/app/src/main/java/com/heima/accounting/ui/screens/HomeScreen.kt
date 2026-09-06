@@ -2,14 +2,13 @@ package com.heima.accounting.ui.screens
 
 import android.icu.util.Calendar
 import android.icu.util.ULocale
-import androidx.compose.animation.AnimatedContent
+import android.os.SystemClock
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,10 +27,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,15 +44,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
+import com.heima.accounting.designsystem.HeimaMotionTokens
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.LocalHeimaScrolling
@@ -61,21 +71,29 @@ import com.heima.accounting.domain.HealthGrade
 import com.heima.accounting.domain.HealthMetric
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
+import com.heima.accounting.domain.Transaction
 import com.heima.accounting.domain.formatYuan
+import com.heima.accounting.ui.AnimatedAmount
 import com.heima.accounting.ui.AnimatedBarChart
 import com.heima.accounting.ui.AnimatedBudgetGauge
 import com.heima.accounting.ui.AnimatedTrendChart
 import com.heima.accounting.ui.CategoryIcon
+import com.heima.accounting.ui.ChartSwitchTransition
+import com.heima.accounting.ui.GlassPullToRefresh
 import com.heima.accounting.ui.MonthCategoryPieChart
+import com.heima.accounting.ui.REFRESH_MIN_DISPLAY_MS
 import com.heima.accounting.ui.SensitiveAmountText
+import com.heima.accounting.ui.StaggeredContent
 import com.heima.accounting.ui.TransactionRow
 import com.heima.accounting.ui.TrendChartSwitcher
 import com.heima.accounting.ui.TrendChartType
+import com.heima.accounting.ui.formatThousands
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -86,7 +104,10 @@ fun HomeScreen(
     onBudgetClick: () -> Unit,
     onOpenRecords: () -> Unit,
     onTransactionClick: (Long) -> Unit,
+    onDeleteTransaction: (Long) -> Unit = {},
+    onRefreshHome: suspend () -> Unit = {},
     onSelectionFeedback: () -> Unit = {},
+    onAmountSettled: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val reduceMotion = HeimaTheme.motion.reduceMotion
@@ -153,17 +174,33 @@ fun HomeScreen(
     // 滚动感知只经 LocalHeimaScrolling 下发（共享约定 6）：derivedStateOf 收敛，
     // 仅在滚动开始/结束各重组一次，玻璃降级与图表暂停都读它。
     val isScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    var refreshing by remember { mutableStateOf(false) }
+
     CompositionLocalProvider(LocalHeimaScrolling provides isScrolling) {
+    GlassPullToRefresh(
+        isRefreshing = refreshing,
+        onRefresh = {
+            refreshing = true
+            try {
+                val start = SystemClock.elapsedRealtime()
+                onRefreshHome()
+                val elapsed = SystemClock.elapsedRealtime() - start
+                if (elapsed < REFRESH_MIN_DISPLAY_MS) delay(REFRESH_MIN_DISPLAY_MS - elapsed)
+            } finally {
+                refreshing = false
+            }
+        },
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         state = listState,
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
-                    Text(dailyGreeting(today), style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
+                    StaggeredGreeting(dailyGreeting(today))
                     Spacer(Modifier.height(5.dp))
                     Text("${today.monthValue}月${today.dayOfMonth}日 $weekday", style = MaterialTheme.typography.headlineLarge, color = palette.textPrimary, fontWeight = FontWeight.SemiBold)
                     Text("${today.year}年 · $lunar", style = MaterialTheme.typography.bodyMedium, color = palette.textTertiary)
@@ -192,33 +229,61 @@ fun HomeScreen(
                 } else {
                     MaterialTheme.typography.headlineLarge
                 }
-                val balanceColor = when {
-                    todaySummary.balanceCents > 0L -> palette.income
-                    todaySummary.balanceCents < 0L -> palette.expense
-                    else -> palette.textSecondary
+                val balanceColor by animateColorAsState(
+                    targetValue = when {
+                        todaySummary.balanceCents > 0L -> palette.income
+                        todaySummary.balanceCents < 0L -> palette.expense
+                        else -> palette.textSecondary
+                    },
+                    label = "balance_color",
+                )
+                val balanceScale = remember { Animatable(1f) }
+                LaunchedEffect(todaySummary.balanceCents, reduceMotion) {
+                    if (!reduceMotion) {
+                        balanceScale.snapTo(1.08f)
+                        balanceScale.animateTo(1f, HeimaMotionTokens.bounce(reduceMotion))
+                    }
                 }
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 21.dp)) {
                     Row(Modifier.fillMaxWidth()) {
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("今日消费", style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
                             Spacer(Modifier.height(4.dp))
-                            SensitiveAmountText(todaySummary.expenseCents, amountsVisible, amountStyle, palette.textPrimary)
+                            AnimatedAmount(
+                                targetCents = todaySummary.expenseCents,
+                                visible = amountsVisible,
+                                style = amountStyle,
+                                color = palette.textPrimary,
+                                format = { it.formatThousands() },
+                                onSettled = onAmountSettled,
+                            )
                         }
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("今日收入", style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
                             Spacer(Modifier.height(4.dp))
-                            SensitiveAmountText(todaySummary.incomeCents, amountsVisible, amountStyle, palette.income)
+                            AnimatedAmount(
+                                targetCents = todaySummary.incomeCents,
+                                visible = amountsVisible,
+                                style = amountStyle,
+                                color = palette.income,
+                                format = { it.formatThousands() },
+                                onSettled = onAmountSettled,
+                            )
                         }
                     }
                     Spacer(Modifier.height(10.dp))
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SensitiveAmountText(
-                            todaySummary.balanceCents,
-                            amountsVisible,
-                            MaterialTheme.typography.titleMedium,
-                            balanceColor,
+                        AnimatedAmount(
+                            targetCents = todaySummary.balanceCents,
+                            visible = amountsVisible,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = balanceColor,
                             prefix = "今日结余  ",
                             signed = true,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = balanceScale.value
+                                scaleY = balanceScale.value
+                            },
                         )
                     }
                 }
@@ -239,23 +304,18 @@ fun HomeScreen(
                         )
                     }
                     Spacer(Modifier.height(10.dp))
-                    // 图表区高度恒定：AnimatedContent 只做透明度过渡，切换时卡片不跳高、不闪白。
+                    // 图表区高度恒定：切换只做粒子/淡入过渡，卡片不跳高、不闪白。
                     Box(Modifier.fillMaxWidth().height(150.dp)) {
                         if (monthSummary.expenseCents == 0L) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text("本月暂无消费", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                             }
                         } else {
-                            AnimatedContent(
+                            // B3：图表切换粒子过渡（旧图淡出+微粒上飘，新图淡入生长）；reduceMotion 降级为纯淡入淡出。
+                            ChartSwitchTransition(
                                 targetState = chartType,
-                                transitionSpec = {
-                                    if (reduceMotion) {
-                                        fadeIn(tween(90)) togetherWith fadeOut(tween(90))
-                                    } else {
-                                        fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(130))
-                                    }
-                                },
-                                label = "trend_chart_type",
+                                reduceMotion = reduceMotion,
+                                modifier = Modifier.fillMaxSize(),
                             ) { type ->
                                 when (type) {
                                     TrendChartType.LINE -> AnimatedTrendChart(monthTrend, Modifier.fillMaxSize())
@@ -315,10 +375,16 @@ fun HomeScreen(
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    healthReport.savingRate?.let { HealthMetricRow("结余率", it) }
-                    healthReport.concentration?.let { HealthMetricRow("支出集中度", it) }
-                    healthReport.savingsProgress?.let { HealthMetricRow("储蓄进度", it) }
-                    healthReport.monthOverMonth?.let { HealthMetricRow("与上月对比", it) }
+                    val healthMetrics = buildList {
+                        healthReport.savingRate?.let { add("结余率" to it) }
+                        healthReport.concentration?.let { add("支出集中度" to it) }
+                        healthReport.savingsProgress?.let { add("储蓄进度" to it) }
+                        healthReport.monthOverMonth?.let { add("与上月对比" to it) }
+                    }
+                    StaggeredContent(healthMetrics.size, baseDelayMs = 60) { index ->
+                        val (label, metric) = healthMetrics[index]
+                        HealthMetricRow(label, metric)
+                    }
                 }
             }
         }
@@ -360,12 +426,105 @@ fun HomeScreen(
             item {
                 GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 25.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                        recent.forEach { transaction -> TransactionRow(transaction, snapshot, amountsVisible, { onTransactionClick(transaction.id) }) }
+                        StaggeredContent(recent.size, baseDelayMs = 40) { index ->
+                            SwipeableTransactionRow(
+                                transaction = recent[index],
+                                snapshot = snapshot,
+                                amountsVisible = amountsVisible,
+                                onClick = { onTransactionClick(recent[index].id) },
+                                onDelete = { onDeleteTransaction(recent[index].id) },
+                            )
+                        }
                     }
                 }
             }
         }
     }
+    }
+    }
+}
+
+/** B2：问候逐字淡入 + 底部辉光横条扫过（每日首次触发）。 */
+@Composable
+private fun StaggeredGreeting(greeting: String) {
+    val palette = HeimaTheme.palette
+    val reduceMotion = HeimaTheme.motion.reduceMotion
+    Row(Modifier.fillMaxWidth()) {
+        greeting.forEachIndexed { index, ch ->
+            val visible = remember(greeting, index) { Animatable(if (reduceMotion) 1f else 0f) }
+            LaunchedEffect(greeting, index, reduceMotion) {
+                if (reduceMotion) {
+                    visible.snapTo(1f)
+                } else {
+                    delay((index * 30).toLong())
+                    visible.animateTo(1f, tween(160))
+                }
+            }
+            Text(
+                ch.toString(),
+                color = palette.textSecondary,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.graphicsLayer { alpha = visible.value },
+            )
+        }
+    }
+    val sweep = remember { Animatable(0f) }
+    LaunchedEffect(greeting, reduceMotion) {
+        if (!reduceMotion) {
+            sweep.snapTo(0f)
+            sweep.animateTo(1f, tween(1200, easing = FastOutSlowInEasing))
+        }
+    }
+    Canvas(Modifier.fillMaxWidth().height(2.dp)) {
+        val bandWidth = size.width * 0.42f
+        val x = sweep.value * (size.width + bandWidth) - bandWidth
+        drawRect(
+            brush = Brush.horizontalGradient(
+                listOf(Color.Transparent, palette.brand.copy(alpha = .5f), Color.Transparent),
+            ),
+            topLeft = Offset(x, 0f),
+            size = Size(bandWidth, size.height),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableTransactionRow(
+    transaction: Transaction,
+    snapshot: LedgerSnapshot,
+    amountsVisible: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val palette = HeimaTheme.palette
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else {
+                false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(palette.expense.copy(alpha = .92f)),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text("删除", color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = 18.dp))
+            }
+        },
+    ) {
+        TransactionRow(transaction, snapshot, amountsVisible, onClick)
     }
 }
 

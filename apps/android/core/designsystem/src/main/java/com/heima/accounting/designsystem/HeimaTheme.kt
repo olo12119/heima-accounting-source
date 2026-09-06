@@ -109,8 +109,8 @@ private val LiquidLight = AppThemeTokens(
     textSecondary = Color(0xFF5F6878),
     textMuted = Color(0xFF9099A8),
     divider = Color(0x1A2C3850),
-    ambientOne = Color(0xFFBFD7FF),
-    ambientTwo = Color(0xFFD7F2FF),
+    ambientOne = Color(0xFF9FC4FF),
+    ambientTwo = Color(0xFFB7E6FF),
     chartColors = listOf(Color(0xFF5A86F7), Color(0xFF2BB39A), Color(0xFFFFA85C), Color(0xFFA46AF1), Color(0xFFEF6D8E), Color(0xFF7F8DA6)),
 )
 
@@ -125,7 +125,7 @@ private val LiquidDark = AppThemeTokens(
     glassBase = Color(0xE6202C40),
     glassTint = Color(0xD9283850),
     glassHighlight = Color(0x2EDCEAFF),
-    glassOutline = Color(0x40C7DBF7),
+    glassOutline = Color(0x5ACFE5FF),
     glassShadow = Color(0x9903070C),
     brand = Color(0xFF8AB2FF),
     brandSoft = Color(0xFF2A4270),
@@ -137,8 +137,8 @@ private val LiquidDark = AppThemeTokens(
     textSecondary = Color(0xFFC3CCD9),
     textMuted = Color(0xFF97A2B4),
     divider = Color(0x29FFFFFF),
-    ambientOne = Color(0xFF1E3B66),
-    ambientTwo = Color(0xFF1A3A4C),
+    ambientOne = Color(0xFF234A80),
+    ambientTwo = Color(0xFF1D4A5E),
     chartColors = listOf(Color(0xFF8AB2FF), Color(0xFF5CD8BC), Color(0xFFFFC284), Color(0xFFC69AFF), Color(0xFFFF97B2), Color(0xFFB0BAC9)),
 )
 
@@ -164,8 +164,8 @@ private val NatureLight = AppThemeTokens(
     textSecondary = Color(0xFF666D62),
     textMuted = Color(0xFF959B90),
     divider = Color(0x1F4B594A),
-    ambientOne = Color(0xFFC9DEBA),
-    ambientTwo = Color(0xFFD9E9D0),
+    ambientOne = Color(0xFFA9D69A),
+    ambientTwo = Color(0xFFBDE8B0),
     chartColors = listOf(Color(0xFF5E9673), Color(0xFF7CA8A0), Color(0xFFD69A67), Color(0xFF9C7FBE), Color(0xFFC97E87), Color(0xFF8A9586)),
 )
 
@@ -179,7 +179,7 @@ private val NatureDark = AppThemeTokens(
     glassBase = Color(0xE324332A),
     glassTint = Color(0xD92C4033),
     glassHighlight = Color(0x28E2F7E9),
-    glassOutline = Color(0x3ACFE6D6),
+    glassOutline = Color(0x5ACFE6D6),
     glassShadow = Color(0x99040805),
     brand = Color(0xFFA0D5B1),
     brandSoft = Color(0xFF2D5039),
@@ -191,8 +191,8 @@ private val NatureDark = AppThemeTokens(
     textSecondary = Color(0xFFCBD3C6),
     textMuted = Color(0xFF9DA896),
     divider = Color(0x29FFFFFF),
-    ambientOne = Color(0xFF2A4C34),
-    ambientTwo = Color(0xFF304B38),
+    ambientOne = Color(0xFF30623E),
+    ambientTwo = Color(0xFF3A6044),
     chartColors = listOf(Color(0xFF95D0AA), Color(0xFF9ACEC6), Color(0xFFEDB586), Color(0xFFC8A5E4), Color(0xFFE7A2AA), Color(0xFFB5C2B1)),
 )
 

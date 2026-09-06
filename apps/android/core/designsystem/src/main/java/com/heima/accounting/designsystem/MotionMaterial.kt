@@ -164,6 +164,27 @@ object HeimaMotionTokens {
         spring(dampingRatio = .86f, stiffness = 420f, visibilityThreshold = null)
     }
 
+    /** 四期：弹性回弹（按压物理 scale 0.97 → 回弹）。 */
+    fun <T> bounce(reduceMotion: Boolean): AnimationSpec<T> = if (reduceMotion) {
+        tween(durationMillis = Fast)
+    } else {
+        spring(dampingRatio = .75f, stiffness = 480f, visibilityThreshold = null)
+    }
+
+    /** 四期：数字滚动到位（AnimatedAmount，180ms 量级的低过冲 spring）。 */
+    fun <T> amount(reduceMotion: Boolean): AnimationSpec<T> = if (reduceMotion) {
+        tween(durationMillis = Fast)
+    } else {
+        spring(dampingRatio = .82f, stiffness = 420f, visibilityThreshold = null)
+    }
+
+    /** 四期：按压物理快回弹（60~90ms 量级）。 */
+    fun <T> press(reduceMotion: Boolean): AnimationSpec<T> = if (reduceMotion) {
+        tween(durationMillis = Instant)
+    } else {
+        spring(dampingRatio = .80f, stiffness = 900f, visibilityThreshold = null)
+    }
+
     fun sharedAxisX(forward: Boolean, reduceMotion: Boolean, distance: Int): ContentTransform {
         if (reduceMotion) return fadeIn(tween(Instant)) togetherWith fadeOut(tween(Instant))
         val outgoing = (Standard * .35f).toInt()
@@ -199,9 +220,9 @@ object HeimaType {
 
 internal fun HeimaShadowLevel.elevation(): Dp = when (this) {
     HeimaShadowLevel.NONE -> 0.dp
-    HeimaShadowLevel.SOFT -> 5.dp
-    HeimaShadowLevel.FLOAT -> 12.dp
-    HeimaShadowLevel.MODAL -> 20.dp
+    HeimaShadowLevel.SOFT -> 8.dp
+    HeimaShadowLevel.FLOAT -> 16.dp
+    HeimaShadowLevel.MODAL -> 24.dp
 }
 
 internal fun AppThemeTokens.solidSurface(role: HeimaSurfaceRole): Color = when (role) {

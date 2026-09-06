@@ -1,6 +1,7 @@
 package com.heima.accounting.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
@@ -67,12 +69,17 @@ import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.StatisticsResult
 import com.heima.accounting.domain.formatYuan
+import com.heima.accounting.ui.AnimatedAmount
 import com.heima.accounting.ui.AnimatedDonutChart
 import com.heima.accounting.ui.AnimatedTrendChart
+import com.heima.accounting.ui.DiaryTrend
 import com.heima.accounting.ui.LiquidGlassDateRangePicker
 import com.heima.accounting.ui.SensitiveAmountText
 import com.heima.accounting.ui.TransactionRow
 import com.heima.accounting.ui.categoryColorFromArgb
+import com.heima.accounting.ui.chartFill
+import com.heima.accounting.ui.formatThousands
+import com.heima.accounting.ui.metalGradient
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -84,6 +91,8 @@ fun StatisticsScreen(
     amountsVisible: Boolean,
     loadStatistics: suspend (DateRange) -> StatisticsResult,
     onSelectionFeedback: () -> Unit,
+    onSwitchFeedback: () -> Unit = {},
+    onAmountSettled: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -140,7 +149,7 @@ fun StatisticsScreen(
         modifier = Modifier.fillMaxWidth(),
         state = listState,
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 50.dp, bottom = 150.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item { ScreenHeading("统计", "读懂每一笔真实收支") }
         item {
@@ -154,7 +163,10 @@ fun StatisticsScreen(
                         GlassSegmentedControl(
                             options = periods,
                             selected = period,
-                            onSelected = { period = it },
+                            onSelected = {
+                                period = it
+                                onSwitchFeedback()
+                            },
                             accessibilityLabel = "统计时间范围",
                         )
                     }
@@ -189,44 +201,58 @@ fun StatisticsScreen(
             }
         }
         item {
-            AnimatedContent(
-                targetState = summary,
-                transitionSpec = {
-                    fadeIn(tween(if (motion.reduceMotion) HeimaMotionTokens.Instant else HeimaMotionTokens.Standard)) togetherWith
-                        fadeOut(tween(if (motion.reduceMotion) 60 else HeimaMotionTokens.Fast))
-                },
-                label = "statistics_summary",
-            ) { visibleSummary ->
-                GlassSurface(Modifier.fillMaxWidth(), 28.dp, backdropBlur = true, role = HeimaSurfaceRole.HERO) {
-                    Column(Modifier.padding(22.dp)) {
-                        Text("支出总额", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(7.dp))
-                        SensitiveAmountText(
-                            visibleSummary.expenseCents,
-                            amountsVisible,
-                            MaterialTheme.typography.displayMedium,
-                            palette.textPrimary,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                            Column {
-                                Text("收入", color = palette.textTertiary)
-                                SensitiveAmountText(
-                                    visibleSummary.incomeCents,
-                                    amountsVisible,
-                                    MaterialTheme.typography.titleMedium,
-                                    palette.income,
-                                )
-                            }
-                            Column {
-                                Text("结余", color = palette.textTertiary)
-                                SensitiveAmountText(
-                                    visibleSummary.balanceCents,
-                                    amountsVisible,
-                                    MaterialTheme.typography.titleMedium,
-                                    if (visibleSummary.balanceCents >= 0) palette.income else palette.expense,
-                                    signed = true,
-                                )
+            // B7：共享元素过渡始终包裹（拍板 4），只在 reduceMotion 下条件去掉 sharedElement，避免条件包 Layout。
+            SharedTransitionLayout {
+                AnimatedContent(
+                    targetState = summary,
+                    transitionSpec = {
+                        fadeIn(tween(if (motion.reduceMotion) HeimaMotionTokens.Instant else HeimaMotionTokens.Standard)) togetherWith
+                            fadeOut(tween(if (motion.reduceMotion) 60 else HeimaMotionTokens.Fast))
+                    },
+                    label = "statistics_summary",
+                ) { visibleSummary ->
+                    val titleState = rememberSharedContentState(key = "stats_total_label")
+                    val amountState = rememberSharedContentState(key = "stats_total_amount")
+                    val avScope = this
+                    GlassSurface(Modifier.fillMaxWidth(), 28.dp, backdropBlur = true, role = HeimaSurfaceRole.HERO) {
+                        Column(Modifier.padding(22.dp)) {
+                            Text(
+                                "支出总额",
+                                color = palette.textSecondary,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = if (motion.reduceMotion) Modifier else Modifier.sharedElement(titleState, avScope),
+                            )
+                            Spacer(Modifier.height(7.dp))
+                            AnimatedAmount(
+                                targetCents = visibleSummary.expenseCents,
+                                visible = amountsVisible,
+                                style = MaterialTheme.typography.displayMedium,
+                                color = palette.textPrimary,
+                                format = { it.formatThousands() },
+                                modifier = if (motion.reduceMotion) Modifier else Modifier.sharedElement(amountState, avScope),
+                                onSettled = onAmountSettled,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                                Column {
+                                    Text("收入", color = palette.textTertiary)
+                                    SensitiveAmountText(
+                                        visibleSummary.incomeCents,
+                                        amountsVisible,
+                                        MaterialTheme.typography.titleMedium,
+                                        palette.income,
+                                    )
+                                }
+                                Column {
+                                    Text("结余", color = palette.textTertiary)
+                                    SensitiveAmountText(
+                                        visibleSummary.balanceCents,
+                                        amountsVisible,
+                                        MaterialTheme.typography.titleMedium,
+                                        if (visibleSummary.balanceCents >= 0) palette.income else palette.expense,
+                                        signed = true,
+                                    )
+                                }
                             }
                         }
                     }
@@ -316,7 +342,12 @@ fun StatisticsScreen(
         item {
             GlassSurface(Modifier.fillMaxWidth(), 25.dp, backdropBlur = false, role = HeimaSurfaceRole.CHART) {
                 Column(Modifier.padding(20.dp)) {
-                    AnimatedTrendChart(summary.dailyTotals, Modifier.fillMaxWidth().height(136.dp))
+                    val spendingDays = summary.dailyTotals.filter { it.expenseCents > 0L }
+                    if (spendingDays.size <= 2 && spendingDays.isNotEmpty()) {
+                        DiaryTrend(summary.dailyTotals, snapshot, amountsVisible, Modifier.fillMaxWidth())
+                    } else {
+                        AnimatedTrendChart(summary.dailyTotals, Modifier.fillMaxWidth().height(136.dp))
+                    }
                     if (summary.dailyTotals.isEmpty()) {
                         Text(
                             "记账后会看到消费随时间的变化",
@@ -333,10 +364,14 @@ fun StatisticsScreen(
                 val index = summary.categoryTotals.indexOf(total)
                 val category = snapshot.category(total.categoryId)
                 val categoryColor = category?.colorArgb?.let(::categoryColorFromArgb) ?: palette.brand
+                val barBrush = metalGradient(index) ?: chartFill(categoryColor)
                 GlassSurface(Modifier.fillMaxWidth(), 19.dp, backdropBlur = false, role = HeimaSurfaceRole.LIST) {
                     Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${index + 1}. ${category?.name ?: "未分类"}", color = palette.textPrimary)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("${index + 1}. ${category?.name ?: "未分类"}", color = palette.textPrimary)
+                                if (index == 0) CrownIcon(Modifier.size(18.dp))
+                            }
                             SensitiveAmountText(
                                 total.amountCents,
                                 amountsVisible,
@@ -350,7 +385,7 @@ fun StatisticsScreen(
                                 Modifier
                                     .fillMaxWidth(total.ratio.coerceIn(0f, 1f))
                                     .height(6.dp)
-                                    .background(categoryColor, RoundedCornerShape(3.dp)),
+                                    .background(barBrush, RoundedCornerShape(3.dp)),
                             )
                         }
                     }
@@ -481,6 +516,26 @@ private fun LegendRow(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
         )
+    }
+}
+
+@Composable
+private fun CrownIcon(modifier: Modifier = Modifier) {
+    val color = HeimaTheme.palette.warning
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            moveTo(w * .10f, h * .78f)
+            lineTo(w * .18f, h * .30f)
+            lineTo(w * .36f, h * .56f)
+            lineTo(w * .50f, h * .22f)
+            lineTo(w * .64f, h * .56f)
+            lineTo(w * .82f, h * .30f)
+            lineTo(w * .90f, h * .78f)
+            close()
+        }
+        drawPath(path, color)
     }
 }
 

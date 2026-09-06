@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -153,14 +154,24 @@ fun CategoryIcon(
         targetValue = if (selected) palette.brandSoft else palette.surface,
         label = "category_icon_surface",
     )
-    val strokeColor by animateColorAsState(
-        targetValue = if (selected) {
-            palette.brand.copy(alpha = .66f)
-        } else {
-            palette.glassStroke.copy(alpha = if (motion.darkTheme) .34f else .82f)
-        },
-        label = "category_icon_stroke",
-    )
+    // 四期 A7：描边改为"同色族渐变描边环"（选中走品牌色族，未选中走玻璃白族）。
+    val strokeBrush = if (selected) {
+        Brush.linearGradient(
+            listOf(
+                palette.brand.copy(alpha = .92f),
+                palette.accent.copy(alpha = .55f),
+                palette.brand.copy(alpha = .92f),
+            ),
+        )
+    } else {
+        Brush.linearGradient(
+            listOf(
+                palette.glassStroke.copy(alpha = if (motion.darkTheme) .44f else .92f),
+                palette.glassHighlight.copy(alpha = if (motion.darkTheme) .22f else .55f),
+                palette.glassStroke.copy(alpha = if (motion.darkTheme) .44f else .82f),
+            ),
+        )
+    }
 
     Box(
         modifier = modifier
@@ -180,9 +191,23 @@ fun CategoryIcon(
                     ),
                 ),
             )
-            .border(1.dp, strokeColor, CircleShape),
+            .border(1.dp, strokeBrush, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         CategoryArtwork(iconKey, Modifier.fillMaxSize())
+        // 四期 A7：顶部微高光层（玻璃反射，位于 3D 图标之上）。
+        Canvas(Modifier.fillMaxSize()) {
+            val canvasSize = this.size
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = if (motion.darkTheme) 0.18f else 0.42f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(canvasSize.width * 0.50f, canvasSize.height * 0.02f),
+                    radius = canvasSize.minDimension * 0.62f,
+                ),
+            )
+        }
     }
 }
