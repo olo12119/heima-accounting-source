@@ -2,6 +2,11 @@ package com.heima.accounting.ui.screens
 
 import android.icu.util.Calendar
 import android.icu.util.ULocale
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,7 +26,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -34,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
-import com.heima.accounting.designsystem.HeimaType
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.FinancialInsightLevel
@@ -42,11 +51,15 @@ import com.heima.accounting.domain.FinancialInsightRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.formatYuan
+import com.heima.accounting.ui.AnimatedBarChart
 import com.heima.accounting.ui.AnimatedBudgetGauge
 import com.heima.accounting.ui.AnimatedTrendChart
 import com.heima.accounting.ui.CategoryIcon
+import com.heima.accounting.ui.MonthCategoryPieChart
 import com.heima.accounting.ui.SensitiveAmountText
 import com.heima.accounting.ui.TransactionRow
+import com.heima.accounting.ui.TrendChartSwitcher
+import com.heima.accounting.ui.TrendChartType
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -61,8 +74,12 @@ fun HomeScreen(
     onBudgetClick: () -> Unit,
     onOpenRecords: () -> Unit,
     onTransactionClick: (Long) -> Unit,
+    onSelectionFeedback: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
+    val reduceMotion = HeimaTheme.motion.reduceMotion
+    // 图表类型只活在本次会话：rememberSaveable 保证切 Tab/旋屏/后台回收不重置，不写盘。
+    var chartType by rememberSaveable { mutableStateOf(TrendChartType.LINE) }
     val today = remember { LocalDate.now() }
     val weekday = remember(today) { today.format(DateTimeFormatter.ofPattern("EEEE", Locale.SIMPLIFIED_CHINESE)) }
     val lunar = remember(today) { formatLunarDate(today) }
@@ -124,51 +141,115 @@ fun HomeScreen(
                 backdropBlur = true,
                 role = HeimaSurfaceRole.HERO,
             ) {
+                // 消费与收入平级等大：任一侧金额达 7 位（万元级）时两列同步降级字号，保证始终一致。
+                val amountStyle = if (maxOf(todaySummary.expenseCents, todaySummary.incomeCents) >= 1_000_000_00L) {
+                    MaterialTheme.typography.headlineMedium
+                } else {
+                    MaterialTheme.typography.headlineLarge
+                }
+                val balanceColor = when {
+                    todaySummary.balanceCents > 0L -> palette.income
+                    todaySummary.balanceCents < 0L -> palette.expense
+                    else -> palette.textSecondary
+                }
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 21.dp)) {
-                    Text("今日消费", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
-                    Spacer(Modifier.height(4.dp))
-                    SensitiveAmountText(todaySummary.expenseCents, amountsVisible, HeimaType.displayAmount, palette.textPrimary)
-                    Spacer(Modifier.height(2.dp))
-                    SensitiveAmountText(todaySummary.incomeCents, amountsVisible, MaterialTheme.typography.bodyLarge, palette.textSecondary, prefix = "今日收入  ")
+                    Row(Modifier.fillMaxWidth()) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("今日消费", style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
+                            Spacer(Modifier.height(4.dp))
+                            SensitiveAmountText(todaySummary.expenseCents, amountsVisible, amountStyle, palette.textPrimary)
+                        }
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("今日收入", style = MaterialTheme.typography.labelLarge, color = palette.textSecondary)
+                            Spacer(Modifier.height(4.dp))
+                            SensitiveAmountText(todaySummary.incomeCents, amountsVisible, amountStyle, palette.income)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        SensitiveAmountText(
+                            todaySummary.balanceCents,
+                            amountsVisible,
+                            MaterialTheme.typography.titleMedium,
+                            balanceColor,
+                            prefix = "今日结余  ",
+                            signed = true,
+                        )
+                    }
                 }
             }
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                GlassSurface(Modifier.weight(1f).height(150.dp), cornerRadius = 26.dp, backdropBlur = false, role = HeimaSurfaceRole.METRIC) {
-                    Column(Modifier.padding(17.dp)) {
+            GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 26.dp, backdropBlur = false, role = HeimaSurfaceRole.CHART) {
+                Column(Modifier.padding(17.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("本月趋势", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(10.dp))
-                        AnimatedTrendChart(monthTrend, Modifier.fillMaxWidth().height(56.dp))
-                        Spacer(Modifier.height(6.dp))
-                        Text(if (monthSummary.expenseCents == 0L) "等待第一笔账" else "本月 ${monthSummary.expenseCents.formatYuan()}", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                        TrendChartSwitcher(
+                            selected = chartType,
+                            onSelect = { selected ->
+                                onSelectionFeedback()
+                                chartType = selected
+                            },
+                        )
                     }
-                }
-                PressableGlassSurface(
-                    onClick = onBudgetClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(150.dp)
-                        .semantics { contentDescription = "查看本月预算" },
-                    cornerRadius = 26.dp,
-                    backdropBlur = true,
-                    role = HeimaSurfaceRole.METRIC,
-                ) {
-                    Box(Modifier.matchParentSize().padding(17.dp)) {
-                        Column {
-                            Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                            Spacer(Modifier.height(8.dp))
-                            if (remainingBudget == null) {
-                                Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
-                                Text("在预算页设置", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
-                            } else {
-                                SensitiveAmountText(remainingBudget, amountsVisible, MaterialTheme.typography.headlineMedium, palette.textPrimary)
-                                Text("本月可用", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(10.dp))
+                    // 图表区高度恒定：AnimatedContent 只做透明度过渡，切换时卡片不跳高、不闪白。
+                    Box(Modifier.fillMaxWidth().height(150.dp)) {
+                        if (monthSummary.expenseCents == 0L) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("本月暂无消费", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                            }
+                        } else {
+                            AnimatedContent(
+                                targetState = chartType,
+                                transitionSpec = {
+                                    if (reduceMotion) {
+                                        fadeIn(tween(90)) togetherWith fadeOut(tween(90))
+                                    } else {
+                                        fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(130))
+                                    }
+                                },
+                                label = "trend_chart_type",
+                            ) { type ->
+                                when (type) {
+                                    TrendChartType.LINE -> AnimatedTrendChart(monthTrend, Modifier.fillMaxSize())
+                                    TrendChartType.BAR -> AnimatedBarChart(monthTrend, Modifier.fillMaxSize())
+                                    TrendChartType.PIE -> MonthCategoryPieChart(monthSummary.categoryTotals, snapshot, Modifier.fillMaxSize())
+                                }
                             }
                         }
-                        if (budget != null) AnimatedBudgetGauge(monthSummary.expenseCents.toFloat() / budget.amountCents, Modifier.size(62.dp).align(Alignment.BottomEnd))
                     }
+                    Spacer(Modifier.height(6.dp))
+                    Text(if (monthSummary.expenseCents == 0L) "等待第一笔账" else "本月 ${monthSummary.expenseCents.formatYuan()}", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+
+        item {
+            PressableGlassSurface(
+                onClick = onBudgetClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .semantics { contentDescription = "查看本月预算" },
+                cornerRadius = 26.dp,
+                backdropBlur = true,
+                role = HeimaSurfaceRole.METRIC,
+            ) {
+                Box(Modifier.matchParentSize().padding(17.dp)) {
+                    Column {
+                        Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(8.dp))
+                        if (remainingBudget == null) {
+                            Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
+                            Text("在预算页设置", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                        } else {
+                            SensitiveAmountText(remainingBudget, amountsVisible, MaterialTheme.typography.headlineMedium, palette.textPrimary)
+                            Text("本月可用", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    if (budget != null) AnimatedBudgetGauge(monthSummary.expenseCents.toFloat() / budget.amountCents, Modifier.size(62.dp).align(Alignment.BottomEnd))
                 }
             }
         }

@@ -113,6 +113,19 @@ object FinanceRules {
         DateRange(startInclusive, endInclusive)
     }
 
+    /**
+     * 返回 null 表示合法；否则返回面向用户的错误文案。
+     * 规则与 AccountingRepository.saveCategory 保持一致（1~20 字、同级不重名、忽略大小写），
+     * 存储层的 require 仍是最终防线。
+     */
+    fun validateCategoryName(name: String?, existingSiblingNames: List<String> = emptyList()): String? {
+        val normalized = name.orEmpty().trim()
+        if (normalized.isEmpty()) return "请输入名称"
+        if (normalized.length > 20) return "名称最长 20 个字"
+        if (existingSiblingNames.any { it.trim().equals(normalized, ignoreCase = true) }) return "该细分已存在"
+        return null
+    }
+
     /** Keeps a mobile donut legible while preserving every category in Other. */
     fun categoryChartSlices(
         totals: List<CategoryTotal>,

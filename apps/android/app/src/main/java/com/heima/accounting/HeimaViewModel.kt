@@ -85,6 +85,30 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * 供记账页"＋添加细分"使用：直接返回新建分类，便于 UI 自动选中。
+     * 失败返回 null（错误文案经 UiEvent.Message 下发）。
+     * 图标与颜色由 UI 层从父分类透传，与分类管理页"添加二级分类"的继承规则一致。
+     */
+    suspend fun addSubcategory(
+        parentId: String,
+        type: EntryType,
+        name: String,
+        iconKey: String,
+        colorArgb: Long,
+    ): Category? = runCatching {
+        repository.saveCategory(
+            existingId = null,
+            type = type,
+            name = name,
+            parentId = parentId,
+            iconKey = iconKey,
+            colorArgb = colorArgb,
+        )
+    }.onFailure { error ->
+        mutableEvents.emit(UiEvent.Message(error.message ?: "操作没有完成，请再试一次"))
+    }.getOrNull()
+
     suspend fun exportBackup(): String = repository.exportBackup()
     suspend fun exportCsv(): String = repository.exportCsv()
     suspend fun loadStatistics(range: DateRange): StatisticsResult = repository.statistics(range)
@@ -96,10 +120,6 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setThemeStyle(value: com.heima.accounting.designsystem.HeimaThemeStyle) = settingsRepository.setThemeStyle(value)
     fun setColorMode(value: com.heima.accounting.designsystem.HeimaColorMode) = settingsRepository.setColorMode(value)
-    fun setVisualQuality(value: com.heima.accounting.designsystem.VisualQuality) = settingsRepository.setVisualQuality(value)
-    fun setLiquidGlassEnabled(value: Boolean) = settingsRepository.setLiquidGlassEnabled(value)
-    fun setSoundEnabled(value: Boolean) = settingsRepository.setSoundEnabled(value)
-    fun setHapticEnabled(value: Boolean) = settingsRepository.setHapticEnabled(value)
     fun setReduceMotionEnabled(value: Boolean) = settingsRepository.setReduceMotionEnabled(value)
     fun setAmountsVisible(value: Boolean) = settingsRepository.setAmountsVisible(value)
 

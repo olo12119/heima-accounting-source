@@ -1,11 +1,11 @@
 package com.heima.accounting
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.heima.accounting.designsystem.HeimaColorMode
 import com.heima.accounting.designsystem.HeimaThemeStyle
-import com.heima.accounting.designsystem.VisualQuality
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -26,36 +26,33 @@ class SettingsRepositoryInstrumentedTest {
     }
 
     @Test
-    fun positiveSwitchNamesMatchPersistedFeatureStateAfterRepositoryRestart() {
+    fun remainingSettingsPersistAfterRepositoryRestart() {
         val first = SettingsRepository(context)
-        first.setLiquidGlassEnabled(false)
-        first.setSoundEnabled(false)
-        first.setHapticEnabled(false)
         first.setReduceMotionEnabled(true)
         first.setThemeStyle(HeimaThemeStyle.NATURE_HEALING)
         first.setColorMode(HeimaColorMode.DARK)
-        first.setVisualQuality(VisualQuality.POWER_SAVER)
+        first.setAmountsVisible(false)
 
         val restored = SettingsRepository(context).state.value
-        assertFalse(restored.liquidGlassEnabled)
-        assertFalse(restored.soundEnabled)
-        assertFalse(restored.hapticEnabled)
         assertTrue(restored.reduceMotionEnabled)
         assertEquals(HeimaThemeStyle.NATURE_HEALING, restored.themeStyle)
         assertEquals(HeimaColorMode.DARK, restored.colorMode)
-        assertEquals(VisualQuality.POWER_SAVER, restored.visualQuality)
+        assertFalse(restored.amountsVisible)
     }
 
     @Test
-    fun liquidGlassCanBeDisabledWithoutChangingTheOtherExperienceDefaults() {
-        SettingsRepository(context).setLiquidGlassEnabled(false)
+    fun legacyRemovedKeysBecomeDeadAndNeverAffectDefaults() {
+        context.getSharedPreferences(SettingsRepository.PREFERENCES_NAME, Context.MODE_PRIVATE).edit {
+            putBoolean("liquid_glass_enabled", false)
+            putBoolean("sound_enabled", false)
+            putBoolean("haptic_enabled", false)
+            putString("visual_quality", "POWER_SAVER")
+        }
 
         val restored = SettingsRepository(context).state.value
-        assertFalse(restored.liquidGlassEnabled)
-        assertTrue(restored.soundEnabled)
-        assertTrue(restored.hapticEnabled)
         assertFalse(restored.reduceMotionEnabled)
+        assertTrue(restored.amountsVisible)
+        assertEquals(HeimaThemeStyle.CLEAR_BLUE, restored.themeStyle)
         assertEquals(HeimaColorMode.SYSTEM, restored.colorMode)
-        assertEquals(VisualQuality.AUTO, restored.visualQuality)
     }
 }

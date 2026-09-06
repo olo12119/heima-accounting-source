@@ -34,14 +34,16 @@ fun HeimaApp() {
         HeimaColorMode.LIGHT -> false
         HeimaColorMode.DARK -> true
     }
-    val effectiveQuality = when {
-        settings.visualQuality == VisualQuality.AUTO && (powerSaveMode || thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) ->
-            VisualQuality.POWER_SAVER
-        else -> settings.visualQuality
+    // 默认"最佳配置"硬编码：玻璃开、音效开、触觉开、画质精美；
+    // 仅在系统省电模式或设备过热时静默降级，不打扰用户。
+    val effectiveQuality = if (powerSaveMode || thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) {
+        VisualQuality.POWER_SAVER
+    } else {
+        VisualQuality.REFINED
     }
     val feedback = rememberInteractionFeedback(
-        soundEnabled = { settings.soundEnabled },
-        hapticEnabled = { settings.hapticEnabled },
+        soundEnabled = { true },
+        hapticEnabled = { true },
     )
 
     HeimaAccountingTheme(
@@ -49,7 +51,7 @@ fun HeimaApp() {
         darkTheme = darkTheme,
         quality = effectiveQuality,
         reduceMotion = settings.reduceMotionEnabled,
-        liquidGlassEnabled = settings.liquidGlassEnabled,
+        liquidGlassEnabled = true,
     ) {
         HeimaShell(
             viewModel = viewModel,
@@ -57,21 +59,12 @@ fun HeimaApp() {
             feedback = feedback,
             themeStyle = settings.themeStyle,
             colorMode = settings.colorMode,
-            visualQuality = settings.visualQuality,
             reduceMotion = settings.reduceMotionEnabled,
-            powerSaveMode = powerSaveMode,
             amountsVisible = settings.amountsVisible,
-            liquidGlassEnabled = settings.liquidGlassEnabled,
-            soundEnabled = settings.soundEnabled,
-            hapticEnabled = settings.hapticEnabled,
             onThemeStyleChange = viewModel::setThemeStyle,
             onColorModeChange = viewModel::setColorMode,
-            onVisualQualityChange = viewModel::setVisualQuality,
             onReduceMotionChange = viewModel::setReduceMotionEnabled,
             onAmountsVisibleChange = viewModel::setAmountsVisible,
-            onLiquidGlassEnabledChange = viewModel::setLiquidGlassEnabled,
-            onSoundEnabledChange = viewModel::setSoundEnabled,
-            onHapticEnabledChange = viewModel::setHapticEnabled,
         )
     }
 }

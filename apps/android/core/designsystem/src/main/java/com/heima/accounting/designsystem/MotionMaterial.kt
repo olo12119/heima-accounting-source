@@ -80,8 +80,8 @@ object HeimaMaterialSystem {
                 refractionHeight = if (high) 4.dp else 2.dp,
                 refractionAmount = if (high) 5.dp else 3.dp,
                 surfaceAlpha = if (allowBackdrop) .28f else .86f,
-                highlightAlpha = if (dark) .07f else .34f,
-                innerShadowAlpha = if (dark) .05f else .17f,
+                highlightAlpha = if (dark) .10f else .34f,
+                innerShadowAlpha = if (dark) .07f else .17f,
                 shadowLevel = HeimaShadowLevel.FLOAT,
             )
             HeimaSurfaceRole.INSIGHT -> HeimaMaterialSpec(
@@ -90,8 +90,8 @@ object HeimaMaterialSystem {
                 refractionHeight = if (high) 3.dp else 1.5.dp,
                 refractionAmount = if (high) 4.dp else 2.dp,
                 surfaceAlpha = if (allowBackdrop) .32f else .88f,
-                highlightAlpha = if (dark) .06f else .29f,
-                innerShadowAlpha = if (dark) .04f else .14f,
+                highlightAlpha = if (dark) .09f else .29f,
+                innerShadowAlpha = if (dark) .06f else .14f,
                 shadowLevel = HeimaShadowLevel.SOFT,
             )
             HeimaSurfaceRole.OVERLAY -> HeimaMaterialSpec(
@@ -100,8 +100,8 @@ object HeimaMaterialSystem {
                 refractionHeight = if (high) 3.dp else 1.dp,
                 refractionAmount = if (high) 4.dp else 2.dp,
                 surfaceAlpha = if (allowBackdrop) .52f else .96f,
-                highlightAlpha = if (dark) .05f else .26f,
-                innerShadowAlpha = if (dark) .05f else .16f,
+                highlightAlpha = if (dark) .08f else .26f,
+                innerShadowAlpha = if (dark) .07f else .16f,
                 shadowLevel = HeimaShadowLevel.MODAL,
             )
             HeimaSurfaceRole.METRIC,
@@ -120,8 +120,8 @@ object HeimaMaterialSystem {
                     refractionHeight = if (high) 2.dp else 1.dp,
                     refractionAmount = if (high) 3.dp else 1.5.dp,
                     surfaceAlpha = if (allowBackdrop) .36f else alpha,
-                    highlightAlpha = if (dark) .045f else .22f,
-                    innerShadowAlpha = if (dark) .03f else .10f,
+                    highlightAlpha = if (dark) .07f else .22f,
+                    innerShadowAlpha = if (dark) .05f else .10f,
                     shadowLevel = if (role == HeimaSurfaceRole.LIST) HeimaShadowLevel.NONE else HeimaShadowLevel.SOFT,
                 )
             }

@@ -80,7 +80,7 @@ fun GlassSurface(
                 )
             },
             highlight = { Highlight.Default.copy(alpha = spec.highlightAlpha) },
-            shadow = { Shadow(alpha = if (material.darkTheme) .12f else .28f) },
+            shadow = { Shadow(alpha = if (material.darkTheme) .20f else .28f) },
             innerShadow = { InnerShadow(radius = 5.dp, alpha = spec.innerShadowAlpha) },
             onDrawSurface = {
                 drawRect(
@@ -120,7 +120,7 @@ fun GlassSurface(
             .shadow(
                 elevation = if (elevation == 14.dp) spec.shadowLevel.elevation() else elevation,
                 shape = shape,
-                ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .30f else .16f),
+                ambientColor = palette.glassShadow.copy(alpha = if (material.darkTheme) .42f else .16f),
                 spotColor = palette.glassShadow,
             )
             .clip(shape)
@@ -136,8 +136,8 @@ fun GlassSurface(
                 val radiusPx = cornerRadius.toPx()
                 val rim = Brush.linearGradient(
                     colors = listOf(
-                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.24f else 0.72f),
-                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.14f else 0.36f),
+                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.30f else 0.72f),
+                        palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.18f else 0.36f),
                         palette.brand.copy(alpha = 0.14f),
                         Color.Transparent,
                     ),
@@ -149,7 +149,7 @@ fun GlassSurface(
                         Color.White.copy(
                             alpha = when {
                                 !material.liquidGlassEnabled -> 0f
-                                material.darkTheme -> 0.025f
+                                material.darkTheme -> 0.045f
                                 quality == VisualQuality.POWER_SAVER -> 0.12f
                                 else -> 0.32f
                             },
@@ -174,7 +174,7 @@ fun GlassSurface(
                             style = Stroke(width = 1.4.dp.toPx()),
                         )
                         drawLine(
-                            color = palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.20f else 0.38f),
+                            color = palette.glassHighlight.copy(alpha = if (material.darkTheme) 0.30f else 0.38f),
                             start = Offset(radiusPx * 0.72f, 1.4.dp.toPx()),
                             end = Offset(size.width - radiusPx * 0.72f, 1.4.dp.toPx()),
                             strokeWidth = 1.2.dp.toPx(),

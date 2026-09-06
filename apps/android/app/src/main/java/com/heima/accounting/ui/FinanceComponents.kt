@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,15 +28,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
@@ -44,8 +51,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.domain.CategoryChartSlice
+import com.heima.accounting.domain.CategoryTotal
 import com.heima.accounting.domain.DailyTotal
 import com.heima.accounting.domain.EntryType
+import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.Transaction
 import com.heima.accounting.domain.formatYuan
@@ -285,6 +294,203 @@ fun AnimatedDonutChart(
                 color = palette.textSecondary,
                 style = MaterialTheme.typography.labelSmall,
             )
+        }
+    }
+}
+
+/** 本月趋势卡支持的三种图表类型。选中态只留在会话级 rememberSaveable，不写盘。 */
+enum class TrendChartType { LINE, BAR, PIE }
+
+/** 柱状图：镜像 AnimatedTrendChart 的动画/交互（生长动画 + 点按/拖动选中 + 右上浮层数值）。 */
+@Composable
+fun AnimatedBarChart(
+    totals: List<DailyTotal>,
+    modifier: Modifier = Modifier,
+    showIncome: Boolean = false,
+) {
+    val palette = HeimaTheme.palette
+    val reduceMotion = HeimaTheme.motion.reduceMotion
+    val key = remember(totals, showIncome) { totals.hashCode() * 31 + showIncome.hashCode() }
+    val progress = remember(key) { Animatable(if (reduceMotion) 1f else 0f) }
+    LaunchedEffect(key, reduceMotion) {
+        if (!reduceMotion) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+        else progress.snapTo(1f)
+    }
+    var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
+    Box(modifier.semantics { contentDescription = "每日收支柱状图，共${totals.size}天数据" }) {
+    Canvas(
+        Modifier
+            .matchParentSize()
+            .pointerInput(totals) {
+                detectTapGestures { tap ->
+                    if (totals.isNotEmpty()) {
+                        selectedIndex = ((tap.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    }
+                }
+            }
+            .pointerInput(totals) {
+                detectDragGestures(
+                    onDragStart = { start ->
+                        if (totals.isNotEmpty()) selectedIndex = ((start.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        if (totals.isNotEmpty()) selectedIndex = ((change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, .9999f) * totals.size).toInt()
+                    },
+                )
+            },
+    ) {
+        val baselineY = size.height - 4.dp.toPx()
+        drawLine(
+            palette.divider,
+            Offset(0f, baselineY),
+            Offset(size.width, baselineY),
+            1.dp.toPx(),
+        )
+        if (totals.isEmpty()) return@Canvas
+        val values = totals.map { if (showIncome) it.incomeCents else it.expenseCents }
+        val maxValue = max(1L, values.maxOrNull() ?: 1L)
+        val slotWidth = size.width / totals.size
+        val barWidth = slotWidth * .56f
+        val usableHeight = size.height - 9.dp.toPx()
+        val barColor = if (showIncome) palette.income else palette.brand
+        values.forEachIndexed { index, value ->
+            // Bars grow out of the baseline as the entrance animation progresses.
+            val barHeight = value.toFloat() / maxValue * usableHeight * progress.value
+            if (barHeight <= 0f) return@forEachIndexed
+            val centerX = slotWidth * (index + .5f)
+            val left = centerX - barWidth / 2f
+            val right = centerX + barWidth / 2f
+            val top = baselineY - barHeight
+            val corner = 3.dp.toPx().coerceAtMost(barWidth / 2f).coerceAtMost(barHeight)
+            val color = if (selectedIndex < 0 || selectedIndex == index) barColor else barColor.copy(alpha = .55f)
+            val bar = Path().apply {
+                moveTo(left, baselineY)
+                lineTo(left, top + corner)
+                quadraticTo(left, top, left + corner, top)
+                lineTo(right - corner, top)
+                quadraticTo(right, top, right, top + corner)
+                lineTo(right, baselineY)
+                close()
+            }
+            drawPath(bar, color)
+        }
+    }
+    totals.getOrNull(selectedIndex)?.let { selected ->
+        val value = if (showIncome) selected.incomeCents else selected.expenseCents
+        Text(
+            text = "${selected.date.format(DateTimeFormatter.ofPattern("M月d日"))}  ${value.formatYuan()}",
+            color = palette.textPrimary,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
+    }
+    }
+}
+
+/** 饼图：包装 AnimatedDonutChart，自带选中态与"分类名 ¥金额 · 占比"标签。 */
+@Composable
+fun MonthCategoryPieChart(
+    totals: List<CategoryTotal>,
+    snapshot: LedgerSnapshot,
+    modifier: Modifier = Modifier,
+) {
+    val palette = HeimaTheme.palette
+    val slices = remember(totals) { FinanceRules.categoryChartSlices(totals) }
+    var selectedIndex by remember(slices) { mutableStateOf<Int?>(null) }
+    Box(modifier.semantics { contentDescription = "本月分类支出占比饼图，点按扇区查看详情" }) {
+        AnimatedDonutChart(
+            slices = slices,
+            colors = palette.chartColors,
+            selectedIndex = selectedIndex,
+            onSelected = { index -> selectedIndex = if (selectedIndex == index) null else index },
+            modifier = Modifier.align(Alignment.Center).size(118.dp),
+            centerTitle = "本月支出",
+            centerSubtitle = slices.sumOf(CategoryChartSlice::amountCents).formatYuan(),
+        )
+        slices.getOrNull(selectedIndex ?: -1)?.let { slice ->
+            val name = slice.categoryId?.let { snapshot.category(it)?.name ?: "未分类" } ?: "其他"
+            Text(
+                text = "$name  ${slice.amountCents.formatYuan()} · ${(slice.ratio * 100).toInt()}%",
+                color = palette.textPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+/** 三图切换器：三个 32.dp 图标位，选中项主色高亮 + 品牌色浅底圆。 */
+@Composable
+fun TrendChartSwitcher(
+    selected: TrendChartType,
+    onSelect: (TrendChartType) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = HeimaTheme.palette
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        TrendChartType.entries.forEach { type ->
+            val isSelected = type == selected
+            val label = when (type) {
+                TrendChartType.LINE -> "折线图"
+                TrendChartType.BAR -> "柱状图"
+                TrendChartType.PIE -> "饼图"
+            }
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .semantics { contentDescription = "切换到$label${if (isSelected) "，当前显示" else ""}" }
+                    .clip(CircleShape)
+                    .background(if (isSelected) palette.brandSoft.copy(alpha = .85f) else Color.Transparent)
+                    .clickable(enabled = !isSelected) { onSelect(type) },
+                contentAlignment = Alignment.Center,
+            ) {
+                TrendChartGlyph(type, if (isSelected) palette.brand else palette.textTertiary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendChartGlyph(type: TrendChartType, color: Color) {
+    Canvas(Modifier.size(17.dp)) {
+        val strokeWidth = 1.6.dp.toPx()
+        when (type) {
+            TrendChartType.LINE -> {
+                val points = listOf(
+                    Offset(size.width * .12f, size.height * .72f),
+                    Offset(size.width * .40f, size.height * .42f),
+                    Offset(size.width * .62f, size.height * .58f),
+                    Offset(size.width * .88f, size.height * .22f),
+                )
+                val line = Path().apply {
+                    moveTo(points.first().x, points.first().y)
+                    points.drop(1).forEach { lineTo(it.x, it.y) }
+                }
+                drawPath(line, color, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                points.forEach { drawCircle(color, radius = strokeWidth * .85f, center = it) }
+            }
+            TrendChartType.BAR -> {
+                val barWidth = size.width * .16f
+                val gap = size.width * .10f
+                var left = size.width * .14f
+                listOf(.48f, .78f, .60f).forEach { ratio ->
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(left, size.height * (1f - ratio)),
+                        size = Size(barWidth, size.height * ratio),
+                        cornerRadius = CornerRadius(barWidth * .32f),
+                    )
+                    left += barWidth + gap
+                }
+            }
+            TrendChartType.PIE -> {
+                val radius = size.minDimension / 2f - strokeWidth / 2f
+                val center = Offset(size.width / 2f, size.height / 2f)
+                drawCircle(color, radius = radius, center = center, style = Stroke(strokeWidth))
+                drawLine(color, center, Offset(center.x, center.y - radius), strokeWidth)
+                drawLine(color, center, Offset(center.x + radius * .87f, center.y + radius * .5f), strokeWidth)
+            }
         }
     }
 }

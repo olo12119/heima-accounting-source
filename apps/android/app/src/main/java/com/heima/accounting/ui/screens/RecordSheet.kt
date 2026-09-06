@@ -58,10 +58,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -81,6 +84,7 @@ import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.Transaction
 import com.heima.accounting.ui.CategoryIcon
+import com.heima.accounting.ui.HeimaDialogFrame
 import com.heima.accounting.ui.LiquidGlassDatePicker
 import java.time.Instant
 import java.time.LocalDate
@@ -100,6 +104,8 @@ fun RecordSheet(
     onAddCategory: (EntryType) -> Unit,
     onSelectionFeedback: () -> Unit = {},
     onVisibilityProgress: (Float) -> Unit = {},
+    onAddSubcategory: suspend (parentId: String, type: EntryType, name: String, iconKey: String, colorArgb: Long) -> Category? = { _, _, _, _, _ -> null },
+    onErrorFeedback: () -> Unit = {},
 ) {
     val palette = HeimaTheme.palette
     val motion = HeimaTheme.motion
@@ -119,6 +125,7 @@ fun RecordSheet(
         )
     }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showAddSubcategory by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dismissing by remember { mutableStateOf(false) }
@@ -291,14 +298,15 @@ fun RecordSheet(
                                 primaryId = category.id
                                 secondaryId = null
                             }
-                            secondaryExpanded = snapshot.childCategories(category.id).isNotEmpty()
+                            // 细分区选中一级分类后常驻展开，末尾固定提供"＋ 添加"入口。
+                            secondaryExpanded = true
                             error = null
                         }
                     }
                 }
 
                 AnimatedVisibility(
-                    visible = secondaryExpanded && selectedPrimary != null && secondaryCategories.isNotEmpty(),
+                    visible = secondaryExpanded && selectedPrimary != null,
                     enter = if (motion.reduceMotion) fadeIn(tween(HeimaMotionTokens.Instant)) else expandVertically(tween(HeimaMotionTokens.Standard)) + fadeIn(tween(HeimaMotionTokens.Fast)),
                     exit = if (motion.reduceMotion) fadeOut(tween(HeimaMotionTokens.Instant)) else shrinkVertically(tween(HeimaMotionTokens.Fast)) + fadeOut(tween(HeimaMotionTokens.Instant)),
                 ) {
@@ -320,6 +328,7 @@ fun RecordSheet(
                                     secondaryId = if (secondaryId == category.id) null else category.id
                                 })
                             }
+                            AddSubcategoryChip { showAddSubcategory = true }
                         }
                     }
                 }
@@ -364,8 +373,14 @@ fun RecordSheet(
                         val cents = amountInputToCents(amountInput)
                         val category = primaryId
                         when {
-                            cents == null || cents <= 0L -> error = "请输入大于 0 的金额"
-                            category == null -> error = "请选择一个一级分类"
+                            cents == null || cents <= 0L -> {
+                                onErrorFeedback()
+                                error = "请输入大于 0 的金额"
+                            }
+                            category == null -> {
+                                onErrorFeedback()
+                                error = "请选择一个一级分类"
+                            }
                             else -> {
                                 val localTime = editing?.occurredAtEpochMillis?.let {
                                     Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalTime()
@@ -401,6 +416,136 @@ fun RecordSheet(
                 showDatePicker = false
             },
         )
+    }
+
+    if (showAddSubcategory) {
+        selectedPrimary?.let { parent ->
+            AddSubcategoryDialog(
+                parentName = parent.name,
+                siblingNames = secondaryCategories.map(Category::name),
+                onDismiss = { showAddSubcategory = false },
+                onErrorFeedback = onErrorFeedback,
+                onConfirm = { name ->
+                    showAddSubcategory = false
+                    // 保存即选中：等待仓库落库后直接选中新细分，全程不离开记账页。
+                    scope.launch {
+                        val created = onAddSubcategory(parent.id, type, name, parent.iconKey, parent.colorArgb)
+                        if (created != null) {
+                            secondaryId = created.id
+                            secondaryExpanded = true
+                            onSelectionFeedback()
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+/** 细分区末尾的常驻入口：样式对齐 GlassChip，品牌色描边使其可辨识。 */
+@Composable
+private fun AddSubcategoryChip(onClick: () -> Unit) {
+    val palette = HeimaTheme.palette
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        Modifier
+            .semantics { contentDescription = "添加细分" }
+            .clip(shape)
+            .background(palette.surfaceMuted.copy(alpha = .5f))
+            .border(1.dp, palette.brand.copy(alpha = .6f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("＋ 添加", color = palette.brand, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** 记账页内直接新增细分的小弹窗：自动唤起键盘，保存即选中。 */
+@Composable
+private fun AddSubcategoryDialog(
+    parentName: String,
+    siblingNames: List<String>,
+    onDismiss: () -> Unit,
+    onErrorFeedback: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val palette = HeimaTheme.palette
+    var value by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    HeimaDialogFrame(onDismiss) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("添加${parentName}细分", color = palette.textPrimary, style = MaterialTheme.typography.titleLarge)
+            GlassFieldSurface(Modifier.fillMaxWidth()) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = { value = it.take(20); error = null },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                        .semantics { contentDescription = "新细分名称，最多 20 个字" },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = palette.textPrimary),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (value.isEmpty()) Text("细分名称，最多 20 个字", color = palette.textTertiary)
+                            inner()
+                        }
+                    },
+                )
+            }
+            error?.let { Text(it, color = palette.expense, style = MaterialTheme.typography.labelMedium) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SubcategoryDialogAction("取消", onDismiss, Modifier.weight(1f))
+                SubcategoryDialogAction(
+                    label = "保存",
+                    onClick = {
+                        val validation = FinanceRules.validateCategoryName(value, siblingNames)
+                        if (validation != null) {
+                            onErrorFeedback()
+                            error = validation
+                        } else {
+                            keyboard?.hide()
+                            onConfirm(value.trim())
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    accent = palette.brand,
+                    enabled = value.isNotBlank(),
+                )
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
+}
+
+@Composable
+private fun SubcategoryDialogAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color? = null,
+    enabled: Boolean = true,
+) {
+    val palette = HeimaTheme.palette
+    PressableGlassSurface(
+        onClick = { if (enabled) onClick() },
+        modifier = modifier
+            .height(44.dp)
+            .alpha(if (enabled) 1f else .45f)
+            .semantics { contentDescription = "对话框操作：$label" },
+        cornerRadius = 15.dp,
+        backdropBlur = false,
+        role = HeimaSurfaceRole.INTERACTIVE,
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(label, color = accent ?: palette.textSecondary, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

@@ -45,7 +45,6 @@ import com.heima.accounting.designsystem.HeimaColorMode
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaThemeStyle
-import com.heima.accounting.designsystem.VisualQuality
 import com.heima.accounting.update.UpdateCheckResult
 import kotlinx.coroutines.launch
 
@@ -54,21 +53,12 @@ fun ProfileScreen(
     transactionCount: Int,
     themeStyle: HeimaThemeStyle,
     colorMode: HeimaColorMode,
-    visualQuality: VisualQuality,
     reduceMotion: Boolean,
-    powerSaveMode: Boolean,
-    liquidGlassEnabled: Boolean,
-    soundEnabled: Boolean,
-    hapticEnabled: Boolean,
     currentVersion: String,
     onCheckUpdate: suspend () -> UpdateCheckResult,
     onThemeStyleChange: (HeimaThemeStyle) -> Unit,
     onColorModeChange: (HeimaColorMode) -> Unit,
-    onVisualQualityChange: (VisualQuality) -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
-    onLiquidGlassEnabledChange: (Boolean) -> Unit,
-    onSoundEnabledChange: (Boolean) -> Unit,
-    onHapticEnabledChange: (Boolean) -> Unit,
     onCategories: () -> Unit,
     onRecords: () -> Unit,
     onData: () -> Unit,
@@ -115,12 +105,7 @@ fun ProfileScreen(
         item {
             GlassSurface(Modifier.fillMaxWidth(), 24.dp, backdropBlur = false, role = HeimaSurfaceRole.INTERACTIVE) {
                 Column(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
-                    SettingToggle("Liquid Glass", "使用折射、透光与玻璃选中镜片", liquidGlassEnabled, onLiquidGlassEnabledChange)
-                    SettingToggle("操作音效", "仅在保存和重要确认时轻声反馈", soundEnabled, onSoundEnabledChange)
-                    SettingToggle("触觉反馈", "轻触选择和确认时提供震动反馈", hapticEnabled, onHapticEnabledChange)
                     SettingToggle("减少动态效果", "保留功能并缩短流体与弹性动画", reduceMotion, onReduceMotionChange)
-                    QualityRow(visualQuality, onVisualQualityChange)
-                    if (powerSaveMode) Text("系统省电模式下将自动降低高成本视觉效果", color = palette.warning, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(vertical = 8.dp))
                 }
             }
         }
@@ -186,16 +171,6 @@ private fun SettingToggle(title: String, subtitle: String, checked: Boolean, onC
             onCheckedChange = onCheckedChange,
             contentDescription = "$title 开关",
         )
-    }
-}
-
-@Composable
-private fun QualityRow(selected: VisualQuality, onSelected: (VisualQuality) -> Unit) {
-    val palette = HeimaTheme.palette
-    Column(Modifier.padding(vertical = 9.dp)) {
-        Text("视觉质量", color = palette.textPrimary, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        SegmentedOptions(listOf(VisualQuality.AUTO to "自动", VisualQuality.REFINED to "精美", VisualQuality.POWER_SAVER to "省电"), selected, onSelected)
     }
 }
 

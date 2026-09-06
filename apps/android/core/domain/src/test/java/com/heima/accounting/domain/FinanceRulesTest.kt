@@ -164,6 +164,46 @@ class FinanceRulesTest {
         assertEquals(listOf(0L, 1_200L, 0L, 900L), result.map(DailyTotal::expenseCents))
     }
 
+    @Test fun categoryNameRejectsBlankAndWhitespaceOnlyInput() {
+        assertEquals("请输入名称", FinanceRules.validateCategoryName(null))
+        assertEquals("请输入名称", FinanceRules.validateCategoryName(""))
+        assertEquals("请输入名称", FinanceRules.validateCategoryName("   "))
+        assertEquals("请输入名称", FinanceRules.validateCategoryName("　　　"))
+        // 首尾空格不计入有效内容：纯空格即使超过 20 个字符也优先报空
+        assertEquals("请输入名称", FinanceRules.validateCategoryName(" ".repeat(25)))
+    }
+
+    @Test fun categoryNameRejectsMoreThanTwentyCharactersAfterTrim() {
+        assertEquals("名称最长 20 个字", FinanceRules.validateCategoryName("一".repeat(21)))
+        assertEquals("名称最长 20 个字", FinanceRules.validateCategoryName("abcdefghijklmnopqrstu"))
+        // 边界：恰好 20 字合法，且首尾空格不计入长度
+        assertNull(FinanceRules.validateCategoryName("一".repeat(20)))
+        assertNull(FinanceRules.validateCategoryName("  " + "一".repeat(20) + "  "))
+    }
+
+    @Test fun categoryNameRejectsDuplicateSiblingIgnoringCaseAndSurroundingSpaces() {
+        val siblings = listOf("早餐", "Taxi", "  地铁  ")
+        assertEquals("该细分已存在", FinanceRules.validateCategoryName("早餐", siblings))
+        assertEquals("该细分已存在", FinanceRules.validateCategoryName("taxi", siblings))
+        assertEquals("该细分已存在", FinanceRules.validateCategoryName("TAXI", siblings))
+        assertEquals("该细分已存在", FinanceRules.validateCategoryName(" 地铁 ", siblings))
+        // 新名称自身带首尾空格时按 trim 后比较
+        assertEquals("该细分已存在", FinanceRules.validateCategoryName("  Taxi  ", siblings))
+    }
+
+    @Test fun categoryNameAcceptsValidUniqueNames() {
+        assertNull(FinanceRules.validateCategoryName("午餐"))
+        assertNull(FinanceRules.validateCategoryName("午餐", listOf("早餐", "晚餐")))
+        // 仅大小写不同不算合法——只有真正不同的名字才通过
+        assertNull(FinanceRules.validateCategoryName("Metro", listOf("Taxi")))
+        assertNull(FinanceRules.validateCategoryName("  网购  ", listOf("外卖")))
+    }
+
+    @Test fun categoryNameChecksEmptinessBeforeLengthBeforeDuplicate() {
+        val longDuplicate = "一".repeat(21)
+        assertEquals("名称最长 20 个字", FinanceRules.validateCategoryName(longDuplicate, listOf(longDuplicate)))
+    }
+
     @Test fun customStatisticsRangeRejectsFutureButAcceptsHistoricalCrossMonthDates() {
         val today = LocalDate.of(2026, 8, 23)
         assertNull(FinanceRules.historicalRangeOrNull(today.plusDays(1), today.plusDays(1), today))

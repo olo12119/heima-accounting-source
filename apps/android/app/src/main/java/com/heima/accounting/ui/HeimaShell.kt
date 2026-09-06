@@ -52,7 +52,6 @@ import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaThemeStyle
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.LocalHeimaBackdrop
-import com.heima.accounting.designsystem.VisualQuality
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.Transaction
 import com.heima.accounting.ui.screens.BudgetScreen
@@ -85,21 +84,12 @@ fun HeimaShell(
     feedback: InteractionFeedback,
     themeStyle: HeimaThemeStyle,
     colorMode: HeimaColorMode,
-    visualQuality: VisualQuality,
     reduceMotion: Boolean,
-    powerSaveMode: Boolean,
     amountsVisible: Boolean,
-    liquidGlassEnabled: Boolean,
-    soundEnabled: Boolean,
-    hapticEnabled: Boolean,
     onThemeStyleChange: (HeimaThemeStyle) -> Unit,
     onColorModeChange: (HeimaColorMode) -> Unit,
-    onVisualQualityChange: (VisualQuality) -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onAmountsVisibleChange: (Boolean) -> Unit,
-    onLiquidGlassEnabledChange: (Boolean) -> Unit,
-    onSoundEnabledChange: (Boolean) -> Unit,
-    onHapticEnabledChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { PagerDestinations.size })
@@ -199,15 +189,7 @@ fun HeimaShell(
                 Modifier
                     .fillMaxSize()
                     .semantics {
-                        contentDescription = buildString {
-                            append(if (liquidGlassEnabled) "Liquid Glass 已开启" else "Liquid Glass 已关闭")
-                            append("；")
-                            append(if (soundEnabled) "操作音效已开启" else "操作音效已关闭")
-                            append("；")
-                            append(if (hapticEnabled) "触觉反馈已开启" else "触觉反馈已关闭")
-                            append("；")
-                            append(if (reduceMotion) "减少动态效果已开启" else "减少动态效果已关闭")
-                        }
+                        contentDescription = if (reduceMotion) "减少动态效果已开启" else "减少动态效果已关闭"
                     },
             ) {
             Box(
@@ -294,6 +276,7 @@ fun HeimaShell(
                                 },
                                 { navigateToSecondary(ManagementPage.RECORDS) },
                                 { editing = it.let { id -> ledgerState.snapshot.transactions.firstOrNull { transaction -> transaction.id == id } }; recordPanelVisible = editing != null },
+                                feedback::selection,
                             )
                             AppDestination.STATISTICS -> StatisticsScreen(
                                 ledgerState.snapshot,
@@ -303,11 +286,9 @@ fun HeimaShell(
                             )
                             AppDestination.BUDGET -> BudgetScreen(ledgerState.snapshot, amountsVisible, viewModel::saveBudget)
                             AppDestination.PROFILE -> ProfileScreen(
-                                ledgerState.snapshot.transactions.size, themeStyle, colorMode, visualQuality, reduceMotion, powerSaveMode,
-                                liquidGlassEnabled, soundEnabled, hapticEnabled,
+                                ledgerState.snapshot.transactions.size, themeStyle, colorMode, reduceMotion,
                                 BuildConfig.VERSION_NAME, AppUpdateChecker::check,
-                                onThemeStyleChange, onColorModeChange, onVisualQualityChange, onReduceMotionChange,
-                                onLiquidGlassEnabledChange, onSoundEnabledChange, onHapticEnabledChange,
+                                onThemeStyleChange, onColorModeChange, onReduceMotionChange,
                                 { navigateToSecondary(ManagementPage.CATEGORIES) },
                                 { navigateToSecondary(ManagementPage.RECORDS) },
                                 { navigateToSecondary(ManagementPage.DATA) },
@@ -369,6 +350,8 @@ fun HeimaShell(
                         { navigateToSecondary(ManagementPage.CATEGORIES); recordPanelVisible = false },
                         feedback::selection,
                         { recordVisibilityProgress = it },
+                        viewModel::addSubcategory,
+                        feedback::error,
                     )
                 }
             }
