@@ -1,5 +1,6 @@
 package com.heima.accounting.data
 
+import com.heima.accounting.domain.BudgetMode
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.LedgerSnapshot
@@ -68,6 +69,17 @@ object BackupCodec {
         require(budgets.map(MonthlyBudget::month).distinct().size == budgets.size) { "预算月份重复" }
         budgets.forEach { budget ->
             require(budget.month.matches(Regex("\\d{4}-(0[1-9]|1[0-2])")) && budget.amountCents > 0L) { "预算内容不正确" }
+            require(budget.savingsGoalCents >= 0L) { "预算内容不正确" }
+            when (budget.mode) {
+                BudgetMode.SAVINGS_GOAL, BudgetMode.MONTHLY_CAP -> Unit
+                BudgetMode.CATEGORY -> budget.categoryBudgets.forEach { (categoryId, limitCents) ->
+                    require(limitCents > 0L) { "预算内容不正确" }
+                    val category = byId[categoryId]
+                    require(
+                        category != null && category.type == EntryType.EXPENSE && category.parentId == null,
+                    ) { "预算分类不正确" }
+                }
+            }
         }
     }
 
@@ -89,7 +101,10 @@ private fun Transaction.toJson() = JSONObject().apply {
 }
 
 private fun MonthlyBudget.toJson() = JSONObject().apply {
-    put("month", month); put("amountCents", amountCents); put("updatedAt", updatedAtEpochMillis)
+    put("month", month); put("amountCents", amountCents)
+    put("mode", mode.name); put("savingsGoalCents", savingsGoalCents)
+    put("categoryBudgets", JSONObject().apply { categoryBudgets.forEach { (id, cents) -> put(id, cents) } })
+    put("updatedAt", updatedAtEpochMillis)
 }
 
 private fun categoryFromJson(json: JSONObject) = Category(
@@ -108,7 +123,18 @@ private fun transactionFromJson(json: JSONObject) = Transaction(
 )
 
 private fun budgetFromJson(json: JSONObject) = MonthlyBudget(
-    month = json.getString("month"), amountCents = json.getLong("amountCents"), updatedAtEpochMillis = json.getLong("updatedAt"),
+    month = json.getString("month"),
+    amountCents = json.getLong("amountCents"),
+    // 旧备份（无新字段）用 opt 兼容读取：默认 MONTHLY_CAP / 0 / emptyMap，导入新版本不丢预算数字。
+    mode = runCatching { BudgetMode.valueOf(json.optString("mode")) }.getOrDefault(BudgetMode.MONTHLY_CAP),
+    savingsGoalCents = json.optLong("savingsGoalCents", 0L),
+    categoryBudgets = runCatching {
+        val obj = json.optJSONObject("categoryBudgets") ?: JSONObject()
+        buildMap {
+            obj.keys().forEach { key -> put(key, obj.getLong(key)) }
+        }
+    }.getOrDefault(emptyMap()),
+    updatedAtEpochMillis = json.getLong("updatedAt"),
 )
 
 private fun JSONObject.optNullableString(key: String): String? = if (isNull(key)) null else getString(key)

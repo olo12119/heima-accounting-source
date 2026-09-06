@@ -3,11 +3,15 @@ package com.heima.accounting.ui.screens
 import android.icu.util.Calendar
 import android.icu.util.ULocale
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +27,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,10 +51,14 @@ import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.GlassSurface
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.LocalHeimaScrolling
 import com.heima.accounting.designsystem.PressableGlassSurface
+import com.heima.accounting.domain.BudgetMode
 import com.heima.accounting.domain.FinanceRules
 import com.heima.accounting.domain.FinancialInsightLevel
 import com.heima.accounting.domain.FinancialInsightRules
+import com.heima.accounting.domain.HealthGrade
+import com.heima.accounting.domain.HealthMetric
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.formatYuan
@@ -61,6 +72,7 @@ import com.heima.accounting.ui.TransactionRow
 import com.heima.accounting.ui.TrendChartSwitcher
 import com.heima.accounting.ui.TrendChartType
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -96,12 +108,41 @@ fun HomeScreen(
         )
     }
     val budget = snapshot.budgets.firstOrNull { it.month == FinanceRules.monthKey(today) }
-    val remainingBudget = budget?.let { (it.amountCents - monthSummary.expenseCents).coerceAtLeast(0L) }
-    val recent = snapshot.transactions.take(6)
-    val insight = remember(snapshot.transactions, snapshot.budgets, snapshot.categories, today) {
-        FinancialInsightRules.evaluate(snapshot, today)
+    // 剩余预算卡口径适配（三期 3.3）：主金额语义一律经 budgetEvaluation 解释（共享约定 2）。
+    val budgetEvaluation = remember(budget, monthSummary) {
+        budget?.let { FinanceRules.budgetEvaluation(it, monthSummary) }
     }
-    val insightColor = when (insight.level) {
+    val budgetCard = when {
+        budgetEvaluation == null -> null
+        else -> when (budgetEvaluation.mode) {
+            BudgetMode.SAVINGS_GOAL -> Triple(
+                "剩余可花",
+                ((budgetEvaluation.limitCents ?: 0L) - budgetEvaluation.spentCents).coerceAtLeast(0L),
+                if (budgetEvaluation.overGoal) "先存后花：储蓄目标优先" else "本月可用",
+            )
+            BudgetMode.MONTHLY_CAP -> Triple(
+                "剩余预算",
+                ((budgetEvaluation.limitCents ?: 0L) - budgetEvaluation.spentCents).coerceAtLeast(0L),
+                "本月可用",
+            )
+            BudgetMode.CATEGORY -> Triple(
+                "分类预算剩余",
+                (budgetEvaluation.categoryLimitTotalCents - budgetEvaluation.categoryRows.sumOf { it.spentCents }).coerceAtLeast(0L),
+                "已设分类可用",
+            )
+        }
+    }
+    val budgetGaugeRatio = when {
+        budgetEvaluation == null -> 0f
+        budgetEvaluation.overGoal -> 1.25f
+        else -> (budgetEvaluation.usageRatio ?: 0f).coerceIn(0f, 1.25f)
+    }
+    val recent = snapshot.transactions.take(6)
+    // 财务体检（三期 3.2）：与统计页小结共用同一 evaluateHealth 口径（共享约定 5）。
+    val healthReport = remember(snapshot.transactions, snapshot.budgets, today) {
+        FinancialInsightRules.evaluateHealth(snapshot, YearMonth.from(today), today)
+    }
+    val reportColor = when (healthReport.level) {
         FinancialInsightLevel.INSUFFICIENT -> palette.brand
         FinancialInsightLevel.STABLE -> palette.income
         FinancialInsightLevel.ATTENTION -> palette.warning
@@ -109,6 +150,10 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+    // 滚动感知只经 LocalHeimaScrolling 下发（共享约定 6）：derivedStateOf 收敛，
+    // 仅在滚动开始/结束各重组一次，玻璃降级与图表暂停都读它。
+    val isScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    CompositionLocalProvider(LocalHeimaScrolling provides isScrolling) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         state = listState,
@@ -239,34 +284,41 @@ fun HomeScreen(
             ) {
                 Box(Modifier.matchParentSize().padding(17.dp)) {
                     Column {
-                        Text("剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+                        Text(budgetCard?.first ?: "剩余预算", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(8.dp))
-                        if (remainingBudget == null) {
+                        if (budgetCard == null) {
                             Text("未设置", color = palette.textPrimary, style = MaterialTheme.typography.headlineMedium)
                             Text("在预算页设置", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                         } else {
-                            SensitiveAmountText(remainingBudget, amountsVisible, MaterialTheme.typography.headlineMedium, palette.textPrimary)
-                            Text("本月可用", color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
+                            SensitiveAmountText(budgetCard.second, amountsVisible, MaterialTheme.typography.headlineMedium, palette.textPrimary)
+                            Text(budgetCard.third, color = palette.textTertiary, style = MaterialTheme.typography.labelMedium)
                         }
                     }
-                    if (budget != null) AnimatedBudgetGauge(monthSummary.expenseCents.toFloat() / budget.amountCents, Modifier.size(62.dp).align(Alignment.BottomEnd))
+                    if (budgetEvaluation != null) {
+                        AnimatedBudgetGauge(budgetGaugeRatio, Modifier.size(62.dp).align(Alignment.BottomEnd))
+                    }
                 }
             }
         }
 
         item {
-            GlassSurface(Modifier.fillMaxWidth().height(145.dp), cornerRadius = 28.dp, backdropBlur = true, role = HeimaSurfaceRole.INSIGHT) {
-                Row(Modifier.matchParentSize().padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("财务状态", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Text(insight.title, color = insightColor, style = MaterialTheme.typography.headlineMedium)
-                        Text(insight.explanation, color = palette.textSecondary, style = MaterialTheme.typography.bodyMedium)
+            // 财务体检卡（三期 3.2）：4 行指标 + 迷你进度条，去掉旧"财务状态"固定高度与圆圈。
+            GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 28.dp, backdropBlur = true, role = HeimaSurfaceRole.INSIGHT) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("财务体检", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            healthReport.title,
+                            color = reportColor,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
-                    Canvas(Modifier.size(74.dp)) {
-                        drawCircle(insightColor.copy(alpha = 0.16f))
-                        drawCircle(insightColor, radius = size.minDimension * 0.30f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
-                    }
+                    Spacer(Modifier.height(6.dp))
+                    healthReport.savingRate?.let { HealthMetricRow("结余率", it) }
+                    healthReport.concentration?.let { HealthMetricRow("支出集中度", it) }
+                    healthReport.savingsProgress?.let { HealthMetricRow("储蓄进度", it) }
+                    healthReport.monthOverMonth?.let { HealthMetricRow("与上月对比", it) }
                 }
             }
         }
@@ -313,6 +365,47 @@ fun HomeScreen(
                 }
             }
         }
+    }
+    }
+}
+
+/** 体检卡单行指标：数值按分档着色，进度条与数值共用同一 ratio（C6）。 */
+@Composable
+private fun HealthMetricRow(label: String, metric: HealthMetric) {
+    val palette = HeimaTheme.palette
+    val reduceMotion = HeimaTheme.motion.reduceMotion
+    val gradeColor = when (metric.grade) {
+        HealthGrade.GOOD -> palette.income
+        HealthGrade.MEDIUM -> palette.textPrimary
+        HealthGrade.POOR -> palette.expense
+        HealthGrade.N_A -> palette.textMuted
+    }
+    val animatedProgress by animateFloatAsState(
+        targetValue = metric.progress.coerceIn(0f, 1f),
+        animationSpec = if (reduceMotion) snap() else tween(420, easing = FastOutSlowInEasing),
+        label = "health_metric_progress",
+    )
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = palette.textSecondary, style = MaterialTheme.typography.labelMedium)
+            Text(
+                metric.displayValue,
+                color = gradeColor,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth().height(5.dp).background(palette.surfaceVariant, RoundedCornerShape(3.dp))) {
+            Box(
+                Modifier
+                    .fillMaxWidth(animatedProgress)
+                    .height(5.dp)
+                    .background(gradeColor, RoundedCornerShape(3.dp)),
+            )
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(metric.text, color = palette.textSecondary, style = MaterialTheme.typography.bodySmall)
     }
 }
 

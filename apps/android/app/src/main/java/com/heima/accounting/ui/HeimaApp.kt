@@ -34,16 +34,17 @@ fun HeimaApp() {
         HeimaColorMode.LIGHT -> false
         HeimaColorMode.DARK -> true
     }
-    // 默认"最佳配置"硬编码：玻璃开、音效开、触觉开、画质精美；
+    // 视觉质量不提供用户开关（二期补丁 A1/A8）：默认"最佳配置"，
     // 仅在系统省电模式或设备过热时静默降级，不打扰用户。
     val effectiveQuality = if (powerSaveMode || thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) {
         VisualQuality.POWER_SAVER
     } else {
         VisualQuality.REFINED
     }
+    // 音效与触觉恢复由用户开关控制（玻璃开关注入主题，见下）。
     val feedback = rememberInteractionFeedback(
-        soundEnabled = { true },
-        hapticEnabled = { true },
+        soundEnabled = { settings.soundEnabled },
+        hapticEnabled = { settings.hapticEnabled },
     )
 
     HeimaAccountingTheme(
@@ -51,7 +52,7 @@ fun HeimaApp() {
         darkTheme = darkTheme,
         quality = effectiveQuality,
         reduceMotion = settings.reduceMotionEnabled,
-        liquidGlassEnabled = true,
+        liquidGlassEnabled = settings.liquidGlassEnabled,
     ) {
         HeimaShell(
             viewModel = viewModel,
@@ -59,10 +60,16 @@ fun HeimaApp() {
             feedback = feedback,
             themeStyle = settings.themeStyle,
             colorMode = settings.colorMode,
+            soundEnabled = settings.soundEnabled,
+            hapticEnabled = settings.hapticEnabled,
+            liquidGlassEnabled = settings.liquidGlassEnabled,
             reduceMotion = settings.reduceMotionEnabled,
             amountsVisible = settings.amountsVisible,
             onThemeStyleChange = viewModel::setThemeStyle,
             onColorModeChange = viewModel::setColorMode,
+            onSoundEnabledChange = viewModel::setSoundEnabled,
+            onHapticEnabledChange = viewModel::setHapticEnabled,
+            onLiquidGlassEnabledChange = viewModel::setLiquidGlassEnabled,
             onReduceMotionChange = viewModel::setReduceMotionEnabled,
             onAmountsVisibleChange = viewModel::setAmountsVisible,
         )

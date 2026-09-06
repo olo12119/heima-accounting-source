@@ -11,6 +11,10 @@ import java.time.temporal.TemporalAdjusters
 object FinanceRules {
     const val MAX_VISIBLE_CATEGORIES = 5
     const val SMALL_CATEGORY_RATIO = 0.03f
+
+    /** 预算提醒阈值唯一来源（拍板 1）：80% 注意 / 100% 超限。 */
+    const val BUDGET_REMINDER_NOTICE = 0.80f
+    const val BUDGET_REMINDER_EXCEEDED = 1.00f
     fun parseYuanToCents(input: String): Long? {
         val normalized = input.trim().trimEnd('.')
         if (!normalized.matches(Regex("\\d{1,9}(\\.\\d{1,2})?"))) return null
@@ -156,6 +160,120 @@ object FinanceRules {
         }
     }
 
+    /**
+     * 预算三模式统一计算（三期 3.3）。主金额 amountCents 的语义按 mode 解释，
+     * 任何新代码不得直接读 amountCents 做跨模式计算——一律先走本函数（共享约定 2）。
+     *
+     * 模式 A（先存后花）：limit = income − savingsGoal（可为负）；limit ≤ 0 时
+     *   usageRatio = null 且 overGoal = true（D6 边界，UI 显示引导语不显示负数）。
+     * 模式 B（整月上限）：limit = amountCents；gauge 的 .85 提示文案由 UI 层处理。
+     * 模式 C（分类预算）：rows 按额度降序；已花从 summary.categoryTotals 取
+     *   （summarize 按一级 categoryId 分组，天然含该分类下所有细分账单，D8）；
+     *   总进度 = Σspent(已设额度分类) / Σlimit，提醒用同一 80%/100% 阈值（D9）。
+     */
+    fun budgetEvaluation(budget: MonthlyBudget, monthSummary: FinanceSummary): BudgetEvaluation {
+        val income = monthSummary.incomeCents
+        val expense = monthSummary.expenseCents
+        val balance = monthSummary.balanceCents
+        return when (budget.mode) {
+            BudgetMode.SAVINGS_GOAL -> {
+                val limit = income - budget.savingsGoalCents
+                val overGoal = limit <= 0L
+                val usage = if (overGoal) null else expense.toFloat() / limit
+                BudgetEvaluation(
+                    mode = BudgetMode.SAVINGS_GOAL,
+                    limitCents = limit,
+                    spentCents = expense,
+                    usageRatio = usage,
+                    reminderLevel = reminderLevel(usage),
+                    categoryRows = emptyList(),
+                    incomeCents = income,
+                    expenseCents = expense,
+                    balanceCents = balance,
+                    overGoal = overGoal,
+                )
+            }
+            BudgetMode.MONTHLY_CAP -> {
+                val usage = expense.toFloat() / budget.amountCents
+                BudgetEvaluation(
+                    mode = BudgetMode.MONTHLY_CAP,
+                    limitCents = budget.amountCents,
+                    spentCents = expense,
+                    usageRatio = usage,
+                    reminderLevel = reminderLevel(usage),
+                    categoryRows = emptyList(),
+                    incomeCents = income,
+                    expenseCents = expense,
+                    balanceCents = balance,
+                    overGoal = false,
+                )
+            }
+            BudgetMode.CATEGORY -> {
+                val rows = budget.categoryBudgets
+                    .map { (categoryId, limitCents) ->
+                        val spent = monthSummary.categoryTotals
+                            .firstOrNull { it.categoryId == categoryId }?.amountCents ?: 0L
+                        CategoryBudgetRow(
+                            categoryId = categoryId,
+                            spentCents = spent,
+                            limitCents = limitCents,
+                            ratio = if (limitCents <= 0L) 0f else spent.toFloat() / limitCents,
+                        )
+                    }
+                    .sortedByDescending(CategoryBudgetRow::limitCents)
+                val limitTotal = rows.sumOf(CategoryBudgetRow::limitCents)
+                val spentTotal = rows.sumOf(CategoryBudgetRow::spentCents)
+                val usage = if (limitTotal <= 0L) null else spentTotal.toFloat() / limitTotal
+                BudgetEvaluation(
+                    mode = BudgetMode.CATEGORY,
+                    limitCents = null,
+                    spentCents = expense,
+                    usageRatio = usage,
+                    reminderLevel = reminderLevel(usage),
+                    categoryRows = rows,
+                    incomeCents = income,
+                    expenseCents = expense,
+                    balanceCents = balance,
+                    overGoal = false,
+                )
+            }
+        }
+    }
+
+    private fun reminderLevel(usageRatio: Float?): BudgetReminder = when {
+        usageRatio == null -> BudgetReminder.NONE
+        usageRatio >= BUDGET_REMINDER_EXCEEDED -> BudgetReminder.EXCEEDED
+        usageRatio >= BUDGET_REMINDER_NOTICE -> BudgetReminder.NOTICE
+        else -> BudgetReminder.NONE
+    }
+
+}
+
+/** 预算提醒两档（拍板 1）：唯一阈值来源在 FinanceRules，UI 不得自写。 */
+enum class BudgetReminder { NONE, NOTICE, EXCEEDED }
+
+/** 分类预算行：spent 从 FinanceSummary.categoryTotals 取（一级分类口径，与统计页一致，D8）。 */
+data class CategoryBudgetRow(
+    val categoryId: String,
+    val spentCents: Long,
+    val limitCents: Long,
+    val ratio: Float,
+)
+
+data class BudgetEvaluation(
+    val mode: BudgetMode,
+    val limitCents: Long?,
+    val spentCents: Long,
+    val usageRatio: Float?,
+    val reminderLevel: BudgetReminder,
+    val categoryRows: List<CategoryBudgetRow>,
+    val incomeCents: Long,
+    val expenseCents: Long,
+    val balanceCents: Long,
+    val overGoal: Boolean,
+) {
+    /** 已设额度的分类的额度合计（仅模式 C 有意义）。 */
+    val categoryLimitTotalCents: Long get() = categoryRows.sumOf(CategoryBudgetRow::limitCents)
 }
 
 fun Long.formatYuan(showSymbol: Boolean = true): String {

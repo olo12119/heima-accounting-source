@@ -15,13 +15,17 @@ import kotlinx.coroutines.flow.asStateFlow
  * intentionally negative product concept is [reduceMotionEnabled], where true
  * means the user explicitly requested reduced motion.
  *
- * Liquid Glass、操作音效、触觉反馈与视觉质量已在本期收敛为"默认最佳配置"，
- * 不再暴露为用户开关：默认值在 HeimaApp 层硬编码，省电/过热由系统自动降级。
- * SharedPreferences 中残留的旧 key 无人读取、自然失效，不影响老用户升级。
+ * 二期补丁：Liquid Glass、操作音效与触觉反馈恢复为用户开关。
+ * SharedPreferences key 沿用一期原名——二期只是删了字段没删数据，
+ * 恢复同名字段后老用户的旧值自动读回，不会出现"开关状态凭空重置"。
+ * 视觉质量不回到用户可配置：省电/过热的静默降级唯一入口在 HeimaApp.effectiveQuality。
  */
 data class HeimaSettings(
     val themeStyle: HeimaThemeStyle = HeimaThemeStyle.CLEAR_BLUE,
     val colorMode: HeimaColorMode = HeimaColorMode.SYSTEM,
+    val soundEnabled: Boolean = true,
+    val hapticEnabled: Boolean = true,
+    val liquidGlassEnabled: Boolean = true,
     val reduceMotionEnabled: Boolean = false,
     val amountsVisible: Boolean = true,
 )
@@ -36,6 +40,9 @@ class SettingsRepository(context: Context) {
 
     fun setThemeStyle(value: HeimaThemeStyle) = update { copy(themeStyle = value) }
     fun setColorMode(value: HeimaColorMode) = update { copy(colorMode = value) }
+    fun setSoundEnabled(value: Boolean) = update { copy(soundEnabled = value) }
+    fun setHapticEnabled(value: Boolean) = update { copy(hapticEnabled = value) }
+    fun setLiquidGlassEnabled(value: Boolean) = update { copy(liquidGlassEnabled = value) }
     fun setReduceMotionEnabled(value: Boolean) = update { copy(reduceMotionEnabled = value) }
     fun setAmountsVisible(value: Boolean) = update { copy(amountsVisible = value) }
 
@@ -44,6 +51,9 @@ class SettingsRepository(context: Context) {
         preferences.edit(commit = true) {
             putString(KEY_THEME_STYLE, updated.themeStyle.name)
             putString(KEY_COLOR_MODE, updated.colorMode.name)
+            putBoolean(KEY_SOUND_ENABLED, updated.soundEnabled)
+            putBoolean(KEY_HAPTIC_ENABLED, updated.hapticEnabled)
+            putBoolean(KEY_LIQUID_GLASS_ENABLED, updated.liquidGlassEnabled)
             putBoolean(KEY_REDUCE_MOTION, updated.reduceMotionEnabled)
             putBoolean(KEY_AMOUNTS_VISIBLE, updated.amountsVisible)
         }
@@ -53,6 +63,9 @@ class SettingsRepository(context: Context) {
     private fun readSettings() = HeimaSettings(
         themeStyle = enumPreference(preferences.getString(KEY_THEME_STYLE, null), HeimaThemeStyle.CLEAR_BLUE),
         colorMode = enumPreference(preferences.getString(KEY_COLOR_MODE, null), HeimaColorMode.SYSTEM),
+        soundEnabled = preferences.getBoolean(KEY_SOUND_ENABLED, true),
+        hapticEnabled = preferences.getBoolean(KEY_HAPTIC_ENABLED, true),
+        liquidGlassEnabled = preferences.getBoolean(KEY_LIQUID_GLASS_ENABLED, true),
         reduceMotionEnabled = preferences.getBoolean(KEY_REDUCE_MOTION, false),
         amountsVisible = preferences.getBoolean(KEY_AMOUNTS_VISIBLE, true),
     )
@@ -64,6 +77,9 @@ class SettingsRepository(context: Context) {
         const val PREFERENCES_NAME = "heima_visual_preferences"
         private const val KEY_THEME_STYLE = "theme_style"
         private const val KEY_COLOR_MODE = "color_mode"
+        private const val KEY_SOUND_ENABLED = "sound_enabled"
+        private const val KEY_HAPTIC_ENABLED = "haptic_enabled"
+        private const val KEY_LIQUID_GLASS_ENABLED = "liquid_glass_enabled"
         private const val KEY_REDUCE_MOTION = "reduce_motion"
         private const val KEY_AMOUNTS_VISIBLE = "amounts_visible"
     }

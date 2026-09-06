@@ -84,10 +84,16 @@ fun HeimaShell(
     feedback: InteractionFeedback,
     themeStyle: HeimaThemeStyle,
     colorMode: HeimaColorMode,
+    soundEnabled: Boolean,
+    hapticEnabled: Boolean,
+    liquidGlassEnabled: Boolean,
     reduceMotion: Boolean,
     amountsVisible: Boolean,
     onThemeStyleChange: (HeimaThemeStyle) -> Unit,
     onColorModeChange: (HeimaColorMode) -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    onHapticEnabledChange: (Boolean) -> Unit,
+    onLiquidGlassEnabledChange: (Boolean) -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onAmountsVisibleChange: (Boolean) -> Unit,
 ) {
@@ -189,7 +195,13 @@ fun HeimaShell(
                 Modifier
                     .fillMaxSize()
                     .semantics {
-                        contentDescription = if (reduceMotion) "减少动态效果已开启" else "减少动态效果已关闭"
+                        // 无障碍描述随体验设置联动，四项开关状态一次读全。
+                        contentDescription = buildString {
+                            append(if (soundEnabled) "操作音效已开启" else "操作音效已关闭")
+                            append(if (hapticEnabled) "，触觉反馈已开启" else "，触觉反馈已关闭")
+                            append(if (liquidGlassEnabled) "，Liquid Glass 已开启" else "，Liquid Glass 已关闭")
+                            append(if (reduceMotion) "，减少动态效果已开启" else "，减少动态效果已关闭")
+                        }
                     },
             ) {
             Box(
@@ -286,9 +298,12 @@ fun HeimaShell(
                             )
                             AppDestination.BUDGET -> BudgetScreen(ledgerState.snapshot, amountsVisible, viewModel::saveBudget)
                             AppDestination.PROFILE -> ProfileScreen(
-                                ledgerState.snapshot.transactions.size, themeStyle, colorMode, reduceMotion,
+                                ledgerState.snapshot.transactions.size, themeStyle, colorMode,
+                                soundEnabled, hapticEnabled, liquidGlassEnabled, reduceMotion,
                                 BuildConfig.VERSION_NAME, AppUpdateChecker::check,
-                                onThemeStyleChange, onColorModeChange, onReduceMotionChange,
+                                onThemeStyleChange, onColorModeChange,
+                                onSoundEnabledChange, onHapticEnabledChange, onLiquidGlassEnabledChange,
+                                onReduceMotionChange,
                                 { navigateToSecondary(ManagementPage.CATEGORIES) },
                                 { navigateToSecondary(ManagementPage.RECORDS) },
                                 { navigateToSecondary(ManagementPage.DATA) },

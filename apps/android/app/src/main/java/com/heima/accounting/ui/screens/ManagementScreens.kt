@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -48,6 +50,7 @@ import com.heima.accounting.designsystem.GlassSegmentedControl
 import com.heima.accounting.designsystem.GlassToggle
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.HeimaSurfaceRole
+import com.heima.accounting.designsystem.LocalHeimaScrolling
 import com.heima.accounting.designsystem.PressableGlassSurface
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
@@ -78,6 +81,9 @@ fun RecordsScreen(
     var deleting by remember { mutableStateOf<Transaction?>(null) }
     val visible = snapshot.transactions.filter { filter == null || it.type == filter }
     val listState = rememberLazyListState()
+    // 滚动感知（三期 3.1）：derivedStateOf 收敛，只在滚动开始/结束各重组一次。
+    val isScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    CompositionLocalProvider(LocalHeimaScrolling provides isScrolling) {
     LazyColumn(
         Modifier.fillMaxWidth(),
         state = listState,
@@ -106,6 +112,7 @@ fun RecordsScreen(
                 }
             }
         }
+    }
     }
     deleting?.let { transaction ->
         GlassConfirmDialog(

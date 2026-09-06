@@ -7,6 +7,7 @@ import com.heima.accounting.data.AccountingRepository
 import com.heima.accounting.data.LedgerState
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
+import com.heima.accounting.domain.MonthlyBudget
 import com.heima.accounting.domain.Transaction
 import com.heima.accounting.domain.DateRange
 import com.heima.accounting.domain.StatisticsResult
@@ -55,9 +56,10 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
         mutableEvents.emit(UiEvent.TransactionRestored(transaction))
     }
 
-    fun saveBudget(month: String, amountCents: Long) = launchOperation {
-        repository.saveBudget(month, amountCents)
-        mutableEvents.emit(UiEvent.Message("本月预算已保存"))
+    /** 三模式预算保存：金额语义（主金额/储蓄目标/分类额度）由仓储层按 mode 校验。 */
+    fun saveBudget(budget: MonthlyBudget) = launchOperation {
+        repository.saveBudget(budget)
+        mutableEvents.emit(UiEvent.Message("预算已保存"))
     }
 
     fun saveCategory(
@@ -120,6 +122,9 @@ class HeimaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setThemeStyle(value: com.heima.accounting.designsystem.HeimaThemeStyle) = settingsRepository.setThemeStyle(value)
     fun setColorMode(value: com.heima.accounting.designsystem.HeimaColorMode) = settingsRepository.setColorMode(value)
+    fun setSoundEnabled(value: Boolean) = settingsRepository.setSoundEnabled(value)
+    fun setHapticEnabled(value: Boolean) = settingsRepository.setHapticEnabled(value)
+    fun setLiquidGlassEnabled(value: Boolean) = settingsRepository.setLiquidGlassEnabled(value)
     fun setReduceMotionEnabled(value: Boolean) = settingsRepository.setReduceMotionEnabled(value)
     fun setAmountsVisible(value: Boolean) = settingsRepository.setAmountsVisible(value)
 

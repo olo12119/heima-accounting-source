@@ -2,6 +2,7 @@ package com.heima.accounting.data
 
 import android.content.Context
 import com.heima.accounting.database.HeimaDatabase
+import com.heima.accounting.domain.BudgetMode
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.LedgerSnapshot
@@ -75,10 +76,24 @@ class AccountingRepository(
         database.restoreTransaction(transaction)
     }
 
-    suspend fun saveBudget(month: String, amountCents: Long) = mutate {
-        require(month.matches(Regex("\\d{4}-(0[1-9]|1[0-2])"))) { "月份格式不正确" }
-        require(amountCents > 0L) { "预算必须大于0" }
-        database.upsertBudget(MonthlyBudget(month, amountCents))
+    /**
+     * 三模式预算保存（三期 3.3）。按 mode 校验对应金额字段；主金额 amountCents 恒 >0
+     * 由 DB CHECK 兜底。分类额度仅限支出一级分类（拍板 5），UI 与仓储双层校验。
+     */
+    suspend fun saveBudget(budget: MonthlyBudget) = mutate {
+        require(budget.month.matches(Regex("\\d{4}-(0[1-9]|1[0-2])"))) { "月份格式不正确" }
+        when (budget.mode) {
+            BudgetMode.MONTHLY_CAP -> require(budget.amountCents > 0L) { "预算必须大于0" }
+            BudgetMode.SAVINGS_GOAL -> require(budget.savingsGoalCents > 0L) { "储蓄目标必须大于0" }
+            BudgetMode.CATEGORY -> {
+                require(budget.categoryBudgets.isNotEmpty()) { "至少给一个分类设置额度" }
+                require(budget.categoryBudgets.values.all { it > 0L }) { "分类额度必须大于0" }
+                require(budget.categoryBudgets.keys.all { id ->
+                    database.readCategories().any { it.id == id && it.type == EntryType.EXPENSE && it.parentId == null }
+                }) { "只能给支出一级分类设置额度" }
+            }
+        }
+        database.upsertBudget(budget)
     }
 
     suspend fun saveCategory(

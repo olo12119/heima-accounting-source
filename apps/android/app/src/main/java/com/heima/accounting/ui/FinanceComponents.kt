@@ -50,6 +50,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.heima.accounting.designsystem.HeimaTheme
+import com.heima.accounting.designsystem.LocalHeimaScrolling
 import com.heima.accounting.domain.CategoryChartSlice
 import com.heima.accounting.domain.CategoryTotal
 import com.heima.accounting.domain.DailyTotal
@@ -109,9 +110,11 @@ fun AnimatedTrendChart(
     val reduceMotion = HeimaTheme.motion.reduceMotion
     val key = remember(totals, showIncome) { totals.hashCode() * 31 + showIncome.hashCode() }
     val progress = remember(key) { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(key, reduceMotion) {
-        if (!reduceMotion) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
-        else progress.snapTo(1f)
+    // P5：滚动中暂停生长动画（协程被取消，Animatable 停在当前值），滚动停止后从当前值续播。
+    val scrolling = LocalHeimaScrolling.current
+    LaunchedEffect(key, reduceMotion, scrolling) {
+        if (reduceMotion) progress.snapTo(1f)
+        else if (!scrolling) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
     }
     var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
     Box(modifier.semantics { contentDescription = "消费趋势图，共${totals.size}天数据" }) {
@@ -230,9 +233,11 @@ fun AnimatedDonutChart(
     val reduceMotion = HeimaTheme.motion.reduceMotion
     val key = remember(slices) { slices.hashCode() }
     val progress = remember(key) { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(key, reduceMotion) {
-        if (!reduceMotion) progress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
-        else progress.snapTo(1f)
+    // P5：滚动中暂停、停止后续播（Animatable 天然保持状态，无闪烁无残影）。
+    val scrolling = LocalHeimaScrolling.current
+    LaunchedEffect(key, reduceMotion, scrolling) {
+        if (reduceMotion) progress.snapTo(1f)
+        else if (!scrolling) progress.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
     }
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(
@@ -312,9 +317,11 @@ fun AnimatedBarChart(
     val reduceMotion = HeimaTheme.motion.reduceMotion
     val key = remember(totals, showIncome) { totals.hashCode() * 31 + showIncome.hashCode() }
     val progress = remember(key) { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(key, reduceMotion) {
-        if (!reduceMotion) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
-        else progress.snapTo(1f)
+    // P5：滚动中暂停、停止后续播（Animatable 天然保持状态，无闪烁无残影）。
+    val scrolling = LocalHeimaScrolling.current
+    LaunchedEffect(key, reduceMotion, scrolling) {
+        if (reduceMotion) progress.snapTo(1f)
+        else if (!scrolling) progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
     }
     var selectedIndex by remember(totals, showIncome) { mutableIntStateOf(-1) }
     Box(modifier.semantics { contentDescription = "每日收支柱状图，共${totals.size}天数据" }) {

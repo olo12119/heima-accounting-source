@@ -5,11 +5,13 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.heima.accounting.domain.BudgetMode
 import com.heima.accounting.domain.Category
 import com.heima.accounting.domain.DefaultCategories
 import com.heima.accounting.domain.EntryType
 import com.heima.accounting.domain.MonthlyBudget
 import com.heima.accounting.domain.Transaction
+import org.json.JSONObject
 
 class HeimaDatabase(context: Context) : SQLiteOpenHelper(
     context.applicationContext,
@@ -29,6 +31,7 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         createVersionOne(db)
         seedDefaultCategories(db)
         migrateOneToTwo(db)
+        migrateTwoToThree(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -36,6 +39,7 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         while (version < newVersion) {
             when (version) {
                 1 -> migrateOneToTwo(db)
+                2 -> migrateTwoToThree(db)
                 else -> error("缺少数据库迁移：$version → ${version + 1}")
             }
             version += 1
@@ -132,11 +136,7 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         writableDatabase.insertWithOnConflict(
             "monthly_budgets",
             null,
-            ContentValues().apply {
-                put("month", budget.month)
-                put("amount_cents", budget.amountCents)
-                put("updated_at", budget.updatedAtEpochMillis)
-            },
+            budget.toValues(),
             SQLiteDatabase.CONFLICT_REPLACE,
         )
     }
@@ -230,17 +230,7 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
             delete("categories", "parent_id IS NULL", null)
             categories.forEach { insertOrThrow("categories", null, it.toValues()) }
             transactions.forEach { insertOrThrow("transactions", null, it.toValues(includeId = true)) }
-            budgets.forEach { budget ->
-                insertOrThrow(
-                    "monthly_budgets",
-                    null,
-                    ContentValues().apply {
-                        put("month", budget.month)
-                        put("amount_cents", budget.amountCents)
-                        put("updated_at", budget.updatedAtEpochMillis)
-                    },
-                )
-            }
+            budgets.forEach { budget -> insertOrThrow("monthly_budgets", null, budget.toValues()) }
         }
     }
 
@@ -336,9 +326,26 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
         )
     }
 
+    private fun migrateTwoToThree(db: SQLiteDatabase) {
+        // 只增列、不改旧列、不重建表：旧行自动获得默认值，amount_cents 原样保留
+        // （老数据零丢失，拍板 2）。迁移由 DATABASE_VERSION 门控，天然幂等。
+        db.execSQL("ALTER TABLE monthly_budgets ADD COLUMN mode TEXT NOT NULL DEFAULT 'MONTHLY_CAP'")
+        db.execSQL("ALTER TABLE monthly_budgets ADD COLUMN savings_goal_cents INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE monthly_budgets ADD COLUMN category_budgets_json TEXT")
+        db.insertWithOnConflict(
+            "schema_migrations",
+            null,
+            ContentValues().apply {
+                put("version", 3)
+                put("applied_at", System.currentTimeMillis())
+            },
+            SQLiteDatabase.CONFLICT_IGNORE,
+        )
+    }
+
     companion object {
         const val DATABASE_NAME = "heima-accounting.sqlite3"
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
 
         private val CATEGORY_COLUMNS = arrayOf(
             "id", "type", "name", "icon_key", "color_argb", "parent_id", "is_custom", "is_active", "sort_order",
@@ -347,8 +354,43 @@ class HeimaDatabase(context: Context) : SQLiteOpenHelper(
             "id", "type", "amount_cents", "category_id", "subcategory_id", "note", "occurred_at",
             "excluded_from_statistics", "created_at", "updated_at",
         )
-        private val BUDGET_COLUMNS = arrayOf("month", "amount_cents", "updated_at")
+        private val BUDGET_COLUMNS = arrayOf(
+            "month", "amount_cents", "updated_at", "mode", "savings_goal_cents", "category_budgets_json",
+        )
     }
+}
+
+private fun MonthlyBudget.toValues(): ContentValues = ContentValues().apply {
+    put("month", month)
+    put("amount_cents", amountCents)
+    put("updated_at", updatedAtEpochMillis)
+    put("mode", mode.name)
+    put("savings_goal_cents", savingsGoalCents)
+    val json = categoryBudgetsToJson()
+    if (json == null) putNull("category_budgets_json") else put("category_budgets_json", json)
+}
+
+/**
+ * 编码：{"<categoryId>": <cents>, ...}；空 map → null（NULL 列表示未设任何分类额度）。
+ */
+internal fun MonthlyBudget.categoryBudgetsToJson(): String? {
+    if (categoryBudgets.isEmpty()) return null
+    return JSONObject().apply {
+        categoryBudgets.forEach { (categoryId, cents) -> put(categoryId, cents) }
+    }.toString()
+}
+
+/**
+ * 解码：null/空串/解析失败 → emptyMap()。防御式设计：坏数据不崩溃，等效于未设额度。
+ */
+internal fun budgetCategoryBudgets(json: String?): Map<String, Long> {
+    if (json.isNullOrBlank()) return emptyMap()
+    return runCatching {
+        val obj = JSONObject(json)
+        val result = linkedMapOf<String, Long>()
+        obj.keys().forEach { key -> result[key] = obj.getLong(key) }
+        result
+    }.getOrDefault(emptyMap())
 }
 
 private fun Category.toValues(includeId: Boolean = true): ContentValues = ContentValues().apply {
@@ -405,6 +447,9 @@ private fun budgetFromCursor(cursor: Cursor): MonthlyBudget = MonthlyBudget(
     month = cursor.getString(0),
     amountCents = cursor.getLong(1),
     updatedAtEpochMillis = cursor.getLong(2),
+    mode = runCatching { BudgetMode.valueOf(cursor.getString(3)) }.getOrDefault(BudgetMode.MONTHLY_CAP),
+    savingsGoalCents = cursor.getLong(4),
+    categoryBudgets = budgetCategoryBudgets(cursor.getString(5)),
 )
 
 private inline fun <T> Cursor.mapRows(mapper: (Cursor) -> T): List<T> = buildList {

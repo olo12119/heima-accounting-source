@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -202,6 +203,137 @@ class FinanceRulesTest {
     @Test fun categoryNameChecksEmptinessBeforeLengthBeforeDuplicate() {
         val longDuplicate = "一".repeat(21)
         assertEquals("名称最长 20 个字", FinanceRules.validateCategoryName(longDuplicate, listOf(longDuplicate)))
+    }
+
+    @Test fun monthlyCapUsageFollowsEightyAndHundredPercentThresholds() {
+        val budget = MonthlyBudget("2026-08", 50_000L)
+        fun evaluation(expense: Long) = FinanceRules.budgetEvaluation(
+            budget,
+            FinanceSummary(expenseCents = expense, incomeCents = 100_000L),
+        )
+        // 差 1 分边界：80% 注意 / 100% 超限（拍板 1）
+        assertEquals(BudgetReminder.NONE, evaluation(39_999L).reminderLevel)
+        assertEquals(BudgetReminder.NOTICE, evaluation(40_000L).reminderLevel)
+        assertEquals(BudgetReminder.NOTICE, evaluation(49_999L).reminderLevel)
+        assertEquals(BudgetReminder.EXCEEDED, evaluation(50_000L).reminderLevel)
+        assertEquals(BudgetReminder.NONE, evaluation(0L).reminderLevel)
+        val at80 = evaluation(40_000L)
+        assertEquals(BudgetMode.MONTHLY_CAP, at80.mode)
+        assertEquals(50_000L, at80.limitCents)
+        assertEquals(40_000L, at80.spentCents)
+        assertEquals(0.8f, at80.usageRatio!!, 1e-5f)
+        assertEquals(60_000L, at80.balanceCents)
+        assertFalse(at80.overGoal)
+        assertTrue(at80.categoryRows.isEmpty())
+    }
+
+    @Test fun savingsGoalLimitIsIncomeMinusGoalNotTheStoredMainAmount() {
+        // 主金额语义映射表：SAVINGS_GOAL 的 amountCents 仅为满足 DB CHECK 的冗余，
+        // 计算一律读 savingsGoalCents——这里故意让两者不同来验证。
+        val budget = MonthlyBudget("2026-08", 30_000L, BudgetMode.SAVINGS_GOAL, savingsGoalCents = 30_000L)
+        fun evaluation(income: Long, expense: Long) = FinanceRules.budgetEvaluation(
+            budget,
+            FinanceSummary(expenseCents = expense, incomeCents = income),
+        )
+        val mid = evaluation(100_000L, 56_000L)
+        assertEquals(70_000L, mid.limitCents) // 100_000 − 30_000，而非 amountCents 的 30_000
+        assertEquals(0.8f, mid.usageRatio!!, 1e-5f)
+        assertEquals(BudgetReminder.NOTICE, mid.reminderLevel)
+        assertEquals(BudgetReminder.EXCEEDED, evaluation(100_000L, 70_000L).reminderLevel)
+        assertEquals(BudgetReminder.NOTICE, evaluation(100_000L, 69_999L).reminderLevel) // 99.998% 仍在注意档
+        assertEquals(BudgetReminder.NONE, evaluation(100_000L, 55_999L).reminderLevel)   // 79.998% 恰低于 80% 档
+        val basic = evaluation(100_000L, 56_000L)
+        assertTrue(basic.categoryRows.isEmpty())
+        assertFalse(basic.overGoal)
+    }
+
+    @Test fun savingsGoalIncomeAtOrBelowGoalMarksOverGoalWithoutNegativeUsage() {
+        fun evaluation(goal: Long, income: Long, expense: Long = 10_000L) = FinanceRules.budgetEvaluation(
+            MonthlyBudget("2026-08", goal, BudgetMode.SAVINGS_GOAL, savingsGoalCents = goal),
+            FinanceSummary(expenseCents = expense, incomeCents = income),
+        )
+        // 收入 < 储蓄目标（D6）：limitCents 为负值保留真实账，但 usage=null、overGoal=true、reminder=NONE
+        val below = evaluation(60_000L, 50_000L)
+        assertTrue(below.overGoal)
+        assertEquals(-10_000L, below.limitCents)
+        assertNull(below.usageRatio)
+        assertEquals(BudgetReminder.NONE, below.reminderLevel)
+        // D6 边界：收入恰等于储蓄目标 → 仍判 overGoal
+        val equal = evaluation(50_000L, 50_000L)
+        assertTrue(equal.overGoal)
+        assertEquals(0L, equal.limitCents)
+        assertNull(equal.usageRatio)
+        // 收入多出 1 分即恢复正常模式：无支出 → usage 0 → NONE
+        val above = evaluation(50_000L, 50_001L, expense = 0L)
+        assertFalse(above.overGoal)
+        assertEquals(1L, above.limitCents)
+        assertEquals(0f, above.usageRatio!!, 1e-5f)
+        assertEquals(BudgetReminder.NONE, above.reminderLevel)
+    }
+
+    @Test fun categoryBudgetAggregatesOnlyBudgetedCategoriesAndSharesThresholds() {
+        val budget = MonthlyBudget(
+            "2026-08",
+            50_000L,
+            BudgetMode.CATEGORY,
+            categoryBudgets = mapOf("food" to 30_000L, "transport" to 20_000L),
+        )
+        fun evaluation(food: Long, transport: Long, unbudgeted: Long) = FinanceRules.budgetEvaluation(
+            budget,
+            FinanceSummary(
+                expenseCents = food + transport + unbudgeted,
+                incomeCents = 100_000L,
+                categoryTotals = listOf(
+                    CategoryTotal("food", food, 0f),
+                    CategoryTotal("transport", transport, 0f),
+                    CategoryTotal("play", unbudgeted, 0f),
+                ),
+            ),
+        )
+        val normal = evaluation(24_000L, 10_000L, 5_000L)
+        // rows 按额度降序（D8：未设额度分类不出行）
+        assertEquals(listOf("food", "transport"), normal.categoryRows.map(CategoryBudgetRow::categoryId))
+        assertEquals(30_000L, normal.categoryRows.first().limitCents)
+        assertEquals(24_000L, normal.categoryRows.first().spentCents)
+        assertEquals(0.8f, normal.categoryRows.first().ratio, 1e-5f)
+        // 总进度只算已设额度分类：Σspent 34_000 / Σlimit 50_000 = 68%（未设的 play 5_000 不计入，D9）
+        assertEquals(0.68f, normal.usageRatio!!, 1e-5f)
+        assertEquals(BudgetReminder.NONE, normal.reminderLevel)
+        assertNull(normal.limitCents)
+        assertEquals(39_000L, normal.expenseCents) // 24_000 + 10_000 + 5_000
+        assertFalse(normal.overGoal)
+        // 阈值与 A/B 模式同源：80%/100% 按"已设额度分类"口径
+        assertEquals(BudgetReminder.NOTICE, evaluation(30_000L, 10_000L, 9_999L).reminderLevel)
+        assertEquals(BudgetReminder.EXCEEDED, evaluation(30_000L, 20_000L, 5_000L).reminderLevel)
+    }
+
+    @Test fun categoryBudgetGuardsAgainstEmptyMapAndNonPositiveLimits() {
+        // 空 map：仓储层虽拒绝保存，计算层仍须防护（不崩溃、usage=null、reminder=NONE）
+        val empty = FinanceRules.budgetEvaluation(
+            MonthlyBudget("2026-08", 1L, BudgetMode.CATEGORY, categoryBudgets = emptyMap()),
+            FinanceSummary(expenseCents = 10_000L),
+        )
+        assertTrue(empty.categoryRows.isEmpty())
+        assertNull(empty.usageRatio)
+        assertEquals(BudgetReminder.NONE, empty.reminderLevel)
+        // limit ≤ 0 的行（仓储层已拒绝保存，此为纯防御路径）：ratio 记 0、不崩溃、
+        // 总进度 = Σspent(全部行)/Σlimit(全部行) = 9_000/20_000 = 45%（实现口径，确定性输出）
+        val withZero = FinanceRules.budgetEvaluation(
+            MonthlyBudget(
+                "2026-08",
+                20_001L,
+                BudgetMode.CATEGORY,
+                categoryBudgets = mapOf("food" to 0L, "transport" to 20_000L),
+            ),
+            FinanceSummary(
+                expenseCents = 9_000L,
+                categoryTotals = listOf(CategoryTotal("food", 5_000L, 0f), CategoryTotal("transport", 4_000L, 0f)),
+            ),
+        )
+        assertEquals(0f, withZero.categoryRows.first { it.categoryId == "food" }.ratio)
+        assertEquals(20_000L, withZero.categoryLimitTotalCents)
+        assertEquals(0.45f, withZero.usageRatio!!, 1e-5f)
+        assertEquals(BudgetReminder.NONE, withZero.reminderLevel)
     }
 
     @Test fun customStatisticsRangeRejectsFutureButAcceptsHistoricalCrossMonthDates() {

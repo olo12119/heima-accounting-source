@@ -46,6 +46,14 @@ import com.kyant.backdrop.shadow.Shadow
 val LocalHeimaBackdrop: ProvidableCompositionLocal<Backdrop?> =
     staticCompositionLocalOf { null }
 
+/**
+ * 滚动感知（三期 3.1）：由各 LazyColumn 的 isScrollInProgress 经 derivedStateOf 驱动。
+ * 默认 false = 现状静止行为；滚动中 GlassSurface 强制走静态渐变底色并跳过 rim 高光，
+ * 图表生长动画暂停、停止后续播。滚动状态只能经这里读取，禁止各组件私自持有 LazyListState 判断。
+ */
+val LocalHeimaScrolling: ProvidableCompositionLocal<Boolean> =
+    staticCompositionLocalOf { false }
+
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
@@ -59,9 +67,12 @@ fun GlassSurface(
     val quality = HeimaTheme.motion.quality
     val material = HeimaTheme.motion
     val backdrop = LocalHeimaBackdrop.current
+    val scrolling = LocalHeimaScrolling.current
     val shape = RoundedCornerShape(cornerRadius)
     val spec = HeimaMaterialSystem.spec(role, backdropBlur)
-    val blurEnabled = spec.backdropBlur && backdrop != null && material.expensiveGlassEnabled && Build.VERSION.SDK_INT >= 33
+    // P1：滚动中禁实时背景模糊，落到下方静态渐变路径（同一套 Token 与透明度公式，观感对齐）。
+    val blurEnabled = spec.backdropBlur && backdrop != null && material.expensiveGlassEnabled &&
+        Build.VERSION.SDK_INT >= 33 && !scrolling
     val surfaceAlpha = spec.surfaceAlpha
 
     val opticalModifier = when {
@@ -167,7 +178,9 @@ fun GlassSurface(
                         cornerRadius = CornerRadius(radiusPx, radiusPx),
                     )
                     drawContent()
-                    if (material.liquidGlassEnabled && material.expensiveGlassEnabled) {
+                    // P3：滚动中跳过 rim 渐变描边与顶边高光（2 次 stroke 采样省掉）；
+                    // sheen（1 次 fill）便宜且消失肉眼可见，保留。
+                    if (material.liquidGlassEnabled && material.expensiveGlassEnabled && !scrolling) {
                         drawRoundRect(
                             brush = rim,
                             cornerRadius = CornerRadius(radiusPx, radiusPx),

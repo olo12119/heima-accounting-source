@@ -53,11 +53,17 @@ fun ProfileScreen(
     transactionCount: Int,
     themeStyle: HeimaThemeStyle,
     colorMode: HeimaColorMode,
+    soundEnabled: Boolean,
+    hapticEnabled: Boolean,
+    liquidGlassEnabled: Boolean,
     reduceMotion: Boolean,
     currentVersion: String,
     onCheckUpdate: suspend () -> UpdateCheckResult,
     onThemeStyleChange: (HeimaThemeStyle) -> Unit,
     onColorModeChange: (HeimaColorMode) -> Unit,
+    onSoundEnabledChange: (Boolean) -> Unit,
+    onHapticEnabledChange: (Boolean) -> Unit,
+    onLiquidGlassEnabledChange: (Boolean) -> Unit,
     onReduceMotionChange: (Boolean) -> Unit,
     onCategories: () -> Unit,
     onRecords: () -> Unit,
@@ -105,6 +111,9 @@ fun ProfileScreen(
         item {
             GlassSurface(Modifier.fillMaxWidth(), 24.dp, backdropBlur = false, role = HeimaSurfaceRole.INTERACTIVE) {
                 Column(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
+                    SettingToggle("操作音效", "仅在保存和重要确认时轻声反馈", soundEnabled, onSoundEnabledChange)
+                    SettingToggle("触觉反馈", "轻触选择和确认时提供震动反馈", hapticEnabled, onHapticEnabledChange)
+                    SettingToggle("Liquid Glass", "使用折射、透光与玻璃选中镜片", liquidGlassEnabled, onLiquidGlassEnabledChange)
                     SettingToggle("减少动态效果", "保留功能并缩短流体与弹性动画", reduceMotion, onReduceMotionChange)
                 }
             }

@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,10 +57,12 @@ import com.heima.accounting.designsystem.HeimaMotionTokens
 import com.heima.accounting.designsystem.HeimaSurfaceRole
 import com.heima.accounting.designsystem.HeimaTheme
 import com.heima.accounting.designsystem.PressableGlassSurface
+import com.heima.accounting.designsystem.LocalHeimaScrolling
 import com.heima.accounting.domain.CategoryChartSlice
 import com.heima.accounting.domain.CategoryTotal
 import com.heima.accounting.domain.DateRange
 import com.heima.accounting.domain.FinanceRules
+import com.heima.accounting.domain.FinancialInsightRules
 import com.heima.accounting.domain.LedgerSnapshot
 import com.heima.accounting.domain.StatisticsPeriod
 import com.heima.accounting.domain.StatisticsResult
@@ -70,6 +74,7 @@ import com.heima.accounting.ui.SensitiveAmountText
 import com.heima.accounting.ui.TransactionRow
 import com.heima.accounting.ui.categoryColorFromArgb
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -128,6 +133,9 @@ fun StatisticsScreen(
     }
 
     val listState = rememberLazyListState()
+    // 滚动感知（三期 3.1）：derivedStateOf 收敛，只在滚动开始/结束各重组一次。
+    val isScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    CompositionLocalProvider(LocalHeimaScrolling provides isScrolling) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         state = listState,
@@ -158,6 +166,26 @@ fun StatisticsScreen(
                     onEdit = { showDatePicker = true },
                     onReset = { customStartIso = null; customEndIso = null },
                 )
+            }
+        }
+        // 财务小结（三期 3.2）：range 恰好覆盖单一自然月时显示该月小结（C8/C9/C10），
+        // 与首页体检卡共用同一 evaluateHealth 口径（共享约定 5），不新增 DB 查询。
+        if (YearMonth.from(range.startInclusive) == YearMonth.from(range.endInclusive)) {
+            item {
+                val summaryReport = remember(snapshot.transactions, snapshot.budgets, range) {
+                    FinancialInsightRules.evaluateHealth(
+                        snapshot,
+                        YearMonth.from(range.startInclusive),
+                        LocalDate.now(),
+                    )
+                }
+                GlassSurface(Modifier.fillMaxWidth(), 24.dp, backdropBlur = false, role = HeimaSurfaceRole.INSIGHT) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text("财务小结", color = palette.textSecondary, style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(6.dp))
+                        Text(summaryReport.summaryText, color = palette.textPrimary, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
             }
         }
         item {
@@ -329,6 +357,7 @@ fun StatisticsScreen(
                 }
             }
         }
+    }
     }
 
     if (showDatePicker) {

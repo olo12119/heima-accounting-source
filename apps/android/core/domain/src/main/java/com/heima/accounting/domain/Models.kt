@@ -34,9 +34,21 @@ data class Transaction(
         Instant.ofEpochMilli(occurredAtEpochMillis).atZone(zoneId).toLocalDate()
 }
 
+/**
+ * 预算三模式（三期 3.3）：
+ * SAVINGS_GOAL = 先存后花（默认）；MONTHLY_CAP = 整月上限；CATEGORY = 分类预算。
+ * [MonthlyBudget.amountCents] 是受 DB CHECK(>0) 约束的"主金额"，按 mode 解释：
+ * MONTHLY_CAP → 整月上限；SAVINGS_GOAL → 冗余存 savingsGoalCents；
+ * CATEGORY → 冗余存"已设分类额度合计"。跨模式计算一律走 FinanceRules.budgetEvaluation()。
+ */
+enum class BudgetMode { SAVINGS_GOAL, MONTHLY_CAP, CATEGORY }
+
 data class MonthlyBudget(
     val month: String,
     val amountCents: Long,
+    val mode: BudgetMode = BudgetMode.MONTHLY_CAP,
+    val savingsGoalCents: Long = 0L,
+    val categoryBudgets: Map<String, Long> = emptyMap(),
     val updatedAtEpochMillis: Long = System.currentTimeMillis(),
 )
 
